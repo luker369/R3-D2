@@ -19,28 +19,29 @@ const STATUS_CONFIG: Record<AssistantStatus, { label: string; color: string }> =
 
 type Props = {
   status: AssistantStatus;
+  looping: boolean;
   onPress: () => void;
 };
 
-export function ListenButton({ status, onPress }: Props) {
+export function ListenButton({ status, looping, onPress }: Props) {
   const { label, color } = STATUS_CONFIG[status];
-  const disabled = status === 'processing' || status === 'speaking';
+  const displayLabel = looping ? (status === 'idle' ? 'Stop' : label) : label;
+  const displayColor = looping && status === 'idle' ? '#DC2626' : color;
 
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
-      style={[styles.button, { backgroundColor: color }, disabled && styles.disabled]}>
-      <Text style={styles.label}>{label}</Text>
+      style={[styles.button, { backgroundColor: displayColor }]}>
+      <Text style={styles.label}>{displayLabel}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 6,
@@ -50,7 +51,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 10,
     fontWeight: '600',
     textAlign: 'center',
   },

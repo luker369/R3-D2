@@ -10,12 +10,12 @@
  */
 
 import { useState, useRef } from 'react';
-import { Audio } from 'expo-av';
 import {
   AudioModule,
   useAudioRecorder,
   useAudioRecorderState,
   RecordingPresets,
+  setAudioModeAsync,
 } from 'expo-audio';
 
 const METERING_INTERVAL_MS = 100; // poll 10× per second
@@ -45,7 +45,7 @@ export function useVoiceRecorder() {
     }
 
     try {
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      await setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
     } catch (e) {

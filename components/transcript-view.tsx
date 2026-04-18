@@ -1,16 +1,4 @@
-/**
- * components/transcript-view.tsx
- *
- * Scrollable conversation log.
- * User turns are right-aligned (blue tint), assistant turns are left-aligned (gray).
- * Auto-scrolls to the bottom whenever entries change.
- *
- * Later: replace with a FlatList for better performance on long conversations,
- * and add timestamps once Supabase persistence is in place.
- */
-
-import React, { useRef, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import type { TranscriptEntry } from '@/hooks/use-voice-assistant';
 
 type Props = {
@@ -18,85 +6,70 @@ type Props = {
 };
 
 export function TranscriptView({ entries }: Props) {
-  const scrollRef = useRef<ScrollView>(null);
-
-  // Scroll to bottom whenever a new entry is added
-  useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
-  }, [entries]);
-
-  if (entries.length === 0) {
-    return (
-      <View style={styles.empty}>
-        <Text style={styles.emptyText}>Tap the button and start talking.</Text>
-      </View>
-    );
-  }
+  const lastUser      = [...entries].reverse().find(e => e.role === 'user');
+  const lastAssistant = [...entries].reverse().find(e => e.role === 'assistant');
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      style={styles.scroll}
-      contentContainerStyle={styles.content}>
-      {entries.map(entry => (
-        <View
-          key={entry.id}
-          style={[
-            styles.bubble,
-            entry.role === 'user' ? styles.userBubble : styles.assistantBubble,
-          ]}>
-          <Text style={styles.role}>
-            {entry.role === 'user' ? 'You' : 'Assistant'}
-          </Text>
-          <Text style={styles.text}>{entry.text}</Text>
+    <View style={styles.container}>
+      {lastAssistant && (
+        <View style={[styles.bubble, styles.assistantBubble]}>
+          <Text selectable style={styles.text}>{lastAssistant.text}</Text>
         </View>
-      ))}
-    </ScrollView>
+      )}
+      {lastUser && (
+        <View style={[styles.bubble, styles.userBubble]}>
+          {lastUser.imageUri && (
+            <Image source={{ uri: lastUser.imageUri }} style={styles.image} resizeMode="cover" />
+          )}
+          {lastUser.text ? <Text selectable style={styles.text}>{lastUser.text}</Text> : null}
+        </View>
+      )}
+      {!lastAssistant && !lastUser && (
+        <Text style={styles.emptyText}>Tap the button and start talking.</Text>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    width: '100%',
-  },
-  content: {
-    padding: 16,
-    gap: 10,
-  },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    color: '#9CA3AF',
-    fontSize: 14,
+  container: {
+    paddingHorizontal: 20,
+    paddingTop: 48,
+    gap: 12,
   },
   bubble: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 14,
-  },
-  userBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#DBEAFE', // light blue
+    padding: 14,
+    borderRadius: 16,
+    gap: 8,
   },
   assistantBubble: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
     alignSelf: 'flex-start',
-    backgroundColor: '#F3F4F6', // light gray
+    maxWidth: '90%',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
-  role: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6B7280',
-    marginBottom: 3,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  userBubble: {
+    backgroundColor: 'rgba(99,102,241,0.35)',
+    alignSelf: 'flex-end',
+    maxWidth: '90%',
+    borderWidth: 1,
+    borderColor: 'rgba(99,102,241,0.5)',
   },
   text: {
-    fontSize: 15,
-    color: '#111827',
-    lineHeight: 21,
+    fontSize: 16,
+    color: '#f1f5f9',
+    lineHeight: 23,
+  },
+  image: {
+    width: 220,
+    height: 160,
+    borderRadius: 10,
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 20,
   },
 });

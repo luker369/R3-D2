@@ -182,6 +182,7 @@ export function useVoiceAssistant() {
 
   function interrupt() {
     processingGen.current += 1;
+    isProcessing.current = false;
     streamAbort.current?.abort();
     if (currentSound.current) {
       try { currentSound.current.pause(); } catch {}
@@ -421,10 +422,10 @@ export function useVoiceAssistant() {
       // Drain the TTS queue as sentences arrive, without waiting for streaming to finish
       let playIdx = 0;
       while (true) {
-        if (stale()) return;
+        if (stale()) { isProcessing.current = false; return; }
         if (playIdx < ttsQueue.length) {
           const uri = await ttsQueue[playIdx];
-          if (stale()) return;
+          if (stale()) { isProcessing.current = false; return; }
           await playSound(uri);
           playIdx++;
         } else if (streamDone) {
@@ -436,7 +437,7 @@ export function useVoiceAssistant() {
 
       await releasePlaybackAudio();
 
-      if (stale()) return;
+      if (stale()) { isProcessing.current = false; return; }
       const assistantText = await streamPromise; // already resolved
 
       history.current.push({ role: 'assistant', content: assistantText });

@@ -193,11 +193,21 @@ export function useVoiceAssistant() {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  async function releasePlaybackAudio() {
+    await setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: false,
+      shouldDuckAndroid: false,
+      playThroughEarpieceAndroid: false,
+    });
+  }
+
   async function speakAndFinish(reply: string, voice?: TtsVoice) {
     if (mounted.current) addTurn('assistant', reply);
     if (mounted.current) setStatus('speaking');
     const uri = await synthesizeSpeech(reply, 'tts-response.mp3', voice ?? currentVoice());
     await playSound(uri);
+    await releasePlaybackAudio();
     const delay = Math.min(800, 300 + reply.split(/\s+/).length * 20);
     await new Promise<void>(r => setTimeout(r, delay));
     if (isLooping.current) { await resumeLoop(); } else { if (mounted.current) setStatus('idle'); }
@@ -423,6 +433,8 @@ export function useVoiceAssistant() {
           await new Promise<void>(r => setTimeout(r, 50));
         }
       }
+
+      await releasePlaybackAudio();
 
       if (stale()) return;
       const assistantText = await streamPromise; // already resolved

@@ -45,7 +45,14 @@ export function useVoiceRecorder() {
     }
 
     try {
-      await setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      await setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+      // Small gap lets Android release the TTS audio session before re-arming the mic
+      await new Promise<void>(r => setTimeout(r, 150));
       await recorder.prepareToRecordAsync();
       recorder.record();
     } catch (e) {

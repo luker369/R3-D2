@@ -106,6 +106,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionSessionService
+import com.facebook.react.ReactApplication
+import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class AssistInteractionSessionService : VoiceInteractionSessionService() {
     override fun onNewSession(args: Bundle?): VoiceInteractionSession {
@@ -116,12 +118,31 @@ class AssistInteractionSessionService : VoiceInteractionSessionService() {
 class AssistInteractionSession(context: Context) : VoiceInteractionSession(context) {
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
-        val intent = Intent(context, MainActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            data = Uri.parse("r3d2://assist")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+
+        // If the JS runtime is already up (R2 running in FGS), just poke the
+        // listen loop via a bridge event — do NOT launch MainActivity, so
+        // whatever app the user is in stays frontmost.
+        val reactCtx = try {
+            val app = context.applicationContext as? ReactApplication
+            app?.reactNativeHost?.reactInstanceManager?.currentReactContext
+        } catch (t: Throwable) { null }
+
+        if (reactCtx != null) {
+            try {
+                reactCtx
+                    .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                    .emit("r2Assist", null)
+            } catch (_: Throwable) {}
+        } else {
+            // Cold start — no running JS yet, so bringing the app forward is
+            // the only way to boot R2.
+            val intent = Intent(context, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = Uri.parse("r3d2://assist")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            context.startActivity(intent)
         }
-        context.startActivity(intent)
         hide()
     }
 }

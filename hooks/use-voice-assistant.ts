@@ -41,7 +41,7 @@ import {
 } from "@/services/openai";
 import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Linking, type AppStateStatus } from "react-native";
+import { AppState, DeviceEventEmitter, Linking, type AppStateStatus } from "react-native";
 import { useGoogleSignIn } from "./use-google-auth";
 import { useVoiceRecorder } from "./use-voice-recorder";
 
@@ -1331,8 +1331,16 @@ export function useVoiceAssistant() {
       if (url && /assist/i.test(url)) ensureListeningRef.current();
     };
     Linking.getInitialURL().then(onUrl).catch(() => {});
-    const sub = Linking.addEventListener("url", (e) => onUrl(e.url));
-    return () => sub.remove();
+    const urlSub = Linking.addEventListener("url", (e) => onUrl(e.url));
+    // Native AssistInteractionSession emits this when R2 is already running
+    // so it can respond to the assist gesture without popping to the front.
+    const assistSub = DeviceEventEmitter.addListener("r2Assist", () => {
+      ensureListeningRef.current();
+    });
+    return () => {
+      urlSub.remove();
+      assistSub.remove();
+    };
   }, []);
 
   return {

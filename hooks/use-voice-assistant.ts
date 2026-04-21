@@ -42,6 +42,7 @@ import {
 import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, DeviceEventEmitter, Linking, type AppStateStatus } from "react-native";
+import { onAudioFrame } from "@/services/audio-stream";
 import { useGoogleSignIn } from "./use-google-auth";
 import { useVoiceRecorder } from "./use-voice-recorder";
 
@@ -185,17 +186,13 @@ export function useVoiceAssistant() {
     };
   }, []);
 
-  const { startRecording, stopRecording, isRecording, metering } =
+  const { startRecording, stopRecording, isRecording, isRecordingRef } =
     useVoiceRecorder();
 
   const statusRef = useRef<AssistantStatus>(status);
-  const isRecordingRef = useRef(isRecording);
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
-  useEffect(() => {
-    isRecordingRef.current = isRecording;
-  }, [isRecording]);
 
   const resumeLoopRef = useRef<() => Promise<void>>(async () => {});
   const appWasInBackgroundRef = useRef(false);
@@ -218,7 +215,7 @@ export function useVoiceAssistant() {
       if (!mounted.current) return;
       isLooping.current = true;
       setLooping(true);
-      startForegroundService();
+      await startForegroundService();
       const started = await startRecording();
       if (mounted.current) setStatus(started ? "listening" : "idle");
       if (!started) {
@@ -312,12 +309,14 @@ export function useVoiceAssistant() {
 
   resumeLoopRef.current = resumeLoop;
 
-  // Refresh Android FGS when task goes to background; nudge mic when returning (OS often pauses capture).
+  // Track background transitions. Do NOT attempt to start FGS from background —
+  // Android 12+ throws ForegroundServiceStartNotAllowedException. FGS must already
+  // be running before the app is backgrounded; it's started at loop-start while active.
   useEffect(() => {
     const onChange = (next: AppStateStatus) => {
       if (next === "background") {
         appWasInBackgroundRef.current = true;
-        if (isLooping.current) void startForegroundService();
+        console.log("[VA] AppState -> background; FGS running:", isLooping.current);
         return;
       }
       if (
@@ -757,6 +756,10 @@ export function useVoiceAssistant() {
         finalText.trim().split(/\s+/).length < 2 ||
         isHallucination(finalText)
       ) {
+        console.log(
+          `[VA] dropped transcription (${isHallucination(finalText) ? "hallucination" : "too-short"}):`,
+          JSON.stringify(finalText),
+        );
         isProcessing.current = false;
         if (isLooping.current) {
           await resumeLoop();
@@ -1168,54 +1171,72 @@ export function useVoiceAssistant() {
   }, [stopRecording, startRecording]);
 
   // ── Silence detection ──────────────────────────────────────────────────────
+  // Event-driven off the native AudioStreamModule. Does NOT depend on React
+  // state or re-renders, so it continues to run while the activity is
+  // backgrounded (FGS keeps the JS thread alive).
+
+  const processRecordingRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    processRecordingRef.current = () => {
+      void processRecording();
+    };
+  }, [processRecording]);
 
   useEffect(() => {
-    if (!isRecording || metering === undefined || status !== "listening")
-      return;
-    if (Date.now() - recordingStartedAt.current < POST_RESTART_GRACE_MS) return;
+    const unsub = onAudioFrame((frame) => {
+      if (!isRecordingRef.current) return;
+      if (statusRef.current !== "listening") return;
+      if (Date.now() - recordingStartedAt.current < POST_RESTART_GRACE_MS)
+        return;
 
-    const threshold = ambientDb.current + SPEECH_MARGIN_DB;
+      const db = frame.dbfs;
+      const threshold = ambientDb.current + SPEECH_MARGIN_DB;
 
-    if (metering > threshold) {
-      speechSamples.current += 1;
-      if (
-        speechSamples.current >= SPEECH_CONFIRM_SAMPLES &&
-        !hasSpoken.current
-      ) {
-        hasSpoken.current = true;
-        speechStart.current = Date.now();
-        console.log(
-          "[VA] speech armed metering=",
-          metering.toFixed(1),
-          "ambient=",
-          ambientDb.current.toFixed(1),
-        );
-      }
-      silenceStart.current = null;
-    } else {
-      // Update ambient floor only while not actively speaking; clamp so it can't drift above a sane ceiling
-      if (!hasSpoken.current) {
-        const next =
-          ambientDb.current * (1 - AMBIENT_ALPHA) + metering * AMBIENT_ALPHA;
-        ambientDb.current = Math.max(-60, Math.min(-30, next));
-      }
+      if (db > threshold) {
+        speechSamples.current += 1;
+        if (
+          speechSamples.current >= SPEECH_CONFIRM_SAMPLES &&
+          !hasSpoken.current
+        ) {
+          hasSpoken.current = true;
+          speechStart.current = Date.now();
+          console.log(
+            "[VA] speech armed db=",
+            db.toFixed(1),
+            "ambient=",
+            ambientDb.current.toFixed(1),
+          );
+        }
+        silenceStart.current = null;
+      } else {
+        if (!hasSpoken.current) {
+          const next =
+            ambientDb.current * (1 - AMBIENT_ALPHA) + db * AMBIENT_ALPHA;
+          ambientDb.current = Math.max(-60, Math.min(-30, next));
+        }
 
-      if (hasSpoken.current) {
-        speechSamples.current = 0;
-        if (silenceStart.current === null) {
-          silenceStart.current = Date.now();
-        } else if (Date.now() - silenceStart.current >= SILENCE_DURATION_MS) {
-          const spokenDuration = speechStart.current
-            ? Date.now() - speechStart.current
-            : 0;
-          hasSpoken.current = false;
-          speechStart.current = null;
-          silenceStart.current = null;
-          if (spokenDuration >= MIN_SPEECH_DURATION_MS) processRecording();
+        if (hasSpoken.current) {
+          speechSamples.current = 0;
+          if (silenceStart.current === null) {
+            silenceStart.current = Date.now();
+          } else if (
+            Date.now() - silenceStart.current >= SILENCE_DURATION_MS
+          ) {
+            const spokenDuration = speechStart.current
+              ? Date.now() - speechStart.current
+              : 0;
+            hasSpoken.current = false;
+            speechStart.current = null;
+            silenceStart.current = null;
+            if (spokenDuration >= MIN_SPEECH_DURATION_MS) {
+              processRecordingRef.current();
+            }
+          }
         }
       }
-    }
-  }, [metering, isRecording, status, processRecording]);
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (!isRecording) {
@@ -1280,7 +1301,7 @@ export function useVoiceAssistant() {
       isLooping.current = true;
       setLooping(true);
       setError(null);
-      startForegroundService();
+      await startForegroundService();
       const started = await startRecording();
       if (started) {
         setStatus("listening");
@@ -1309,13 +1330,15 @@ export function useVoiceAssistant() {
     } else if (s === "listening") {
       return;
     }
-    if (!isLooping.current) {
+    const needsStart = !isLooping.current;
+    if (needsStart) {
       isLooping.current = true;
       setLooping(true);
       setError(null);
-      void startForegroundService();
     }
-    void startRecording().then((started) => {
+    void (async () => {
+      if (needsStart) await startForegroundService();
+      const started = await startRecording();
       if (!mounted.current) return;
       if (started) setStatus("listening");
       else {
@@ -1323,7 +1346,7 @@ export function useVoiceAssistant() {
         setLooping(false);
         setStatus("error");
       }
-    });
+    })();
   };
 
   useEffect(() => {

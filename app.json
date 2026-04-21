@@ -35,18 +35,6 @@
       ],
       "intentFilters": [
         {
-          "action": "android.intent.action.ASSIST",
-          "category": [
-            "android.intent.category.DEFAULT"
-          ]
-        },
-        {
-          "action": "android.intent.action.VOICE_ASSIST",
-          "category": [
-            "android.intent.category.DEFAULT"
-          ]
-        },
-        {
           "action": "android.intent.action.VIEW",
           "data": {
             "scheme": "com.googleusercontent.apps.823254735040-0uo2mnrd0mc0fiv7bff95jo46uaegdtp"

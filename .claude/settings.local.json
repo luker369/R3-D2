@@ -34,7 +34,24 @@
       "Bash(rm -f C:/Users/walke/Desktop/WebDev/R2-D3/android/app/build/outputs/apk/release/app-release.apk)",
       "Bash(keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk)",
       "Bash(./gradlew :app:packageRelease --rerun-tasks)",
-      "Bash(powershell -c \"\\(Get-Item 'android/app/build/outputs/apk/release/app-release.apk'\\).LastWriteTime\")"
+      "Bash(powershell -c \"\\(Get-Item 'android/app/build/outputs/apk/release/app-release.apk'\\).LastWriteTime\")",
+      "Bash(./gradlew assembleRelease --rerun-tasks)",
+      "Bash(xargs grep *)",
+      "Bash(npx expo-modules-autolinking *)",
+      "Bash(unzip -l android/app/build/outputs/apk/release/app-release.apk)",
+      "Bash(unzip -p android/app/build/outputs/apk/release/app-release.apk classes.dex)",
+      "Bash(awk '{print $NF}')",
+      "Bash(grep -E \"^classes[0-9]*\\\\.dex$\")",
+      "Bash(./gradlew :app:dependencies --configuration releaseRuntimeClasspath)",
+      "Bash(git *)",
+      "Bash(keytool -printcert -jarfile /c/Users/walke/Desktop/WebDev/R2-D3/android/app/build/outputs/apk/release/app-release.apk)",
+      "Bash(\"/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe\" -printcert -jarfile /c/Users/walke/Desktop/WebDev/R2-D3/android/app/build/outputs/apk/release/app-release.apk)",
+      "Bash(\"/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe\" -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey)",
+      "Read(//c/Users/walke/.android/**)",
+      "Read(//c/Users/walke/.android//**)",
+      "Bash(\"/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe\" -list -v -keystore /c/Users/walke/Desktop/WebDev/R2-D3/android/app/debug.keystore -storepass android)",
+      "Bash(./gradlew.bat app:assembleDebug -x lint -x test --console=plain)",
+      "Bash(tasklist //FI \"IMAGENAME eq java.exe\")"
     ]
   }
 }

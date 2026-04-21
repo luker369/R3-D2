@@ -1,0 +1,891 @@
+--------- beginning of main
+04-20 16:08:41.475 I/ReactNativeJS( 5619): '[VA] speech armed metering=', '-30.0', 'ambient=', '-51.6'
+04-20 16:08:43.637 I/ReactNativeJS( 5619): '[VA] processRecording entry isProcessing=', false
+04-20 16:08:43.657 I/ReactNativeJS( 5619): [VA] reset detection state, ambient=-42
+04-20 16:08:43.860 I/ReactNativeJS( 5619): '[VA] stopRecording returned', 'uri'
+04-20 16:08:45.296 I/ReactNativeJS( 5619): [TTS] fetch#0 queued words=7
+04-20 16:08:45.296 I/ReactNativeJS( 5619): [TTS] fetch#0 start (waited 0ms)
+04-20 16:08:45.568 I/ReactNativeJS( 5619): [TTS] fetch#1 queued words=17
+04-20 16:08:45.568 I/ReactNativeJS( 5619): [TTS] fetch#1 start (waited 1ms)
+04-20 16:08:45.839 I/ReactNativeJS( 5619): [TTS] fetch#2 queued words=25
+04-20 16:08:45.849 I/ReactNativeJS( 5619): [TTS] fetch#3 queued words=9
+04-20 16:08:46.131 I/ReactNativeJS( 5619): [TTS] fetch#0 done in 835ms
+04-20 16:08:46.131 I/ReactNativeJS( 5619): [TTS] play#0 start
+04-20 16:08:46.176 I/ReactNativeJS( 5619): [TTS] fetch#2 start (waited 337ms)
+04-20 16:08:46.958 I/ReactNativeJS( 5619): [TTS] fetch#1 done in 1391ms
+04-20 16:08:46.958 I/ReactNativeJS( 5619): [TTS] fetch#3 start (waited 1109ms)
+04-20 16:08:47.470 I/ReactNativeJS( 5619): [TTS] fetch#4 queued words=97
+04-20 16:08:47.509 I/ReactNativeJS( 5619): [TTS] fetch#5 queued words=16
+04-20 16:08:47.511 I/ReactNativeJS( 5619): [TTS] fetch#6 queued words=7
+04-20 16:08:47.745 I/ReactNativeJS( 5619): [TTS] fetch#7 queued words=7
+04-20 16:08:47.907 I/ReactNativeJS( 5619): [TTS] fetch#3 done in 2058ms
+04-20 16:08:47.907 I/ReactNativeJS( 5619): [TTS] fetch#4 start (waited 437ms)
+04-20 16:08:47.948 I/ReactNativeJS( 5619): [TTS] fetch#8 queued words=11
+04-20 16:08:48.122 I/ReactNativeJS( 5619): [TTS] fetch#2 done in 2283ms
+04-20 16:08:48.122 I/ReactNativeJS( 5619): [TTS] fetch#5 start (waited 613ms)
+04-20 16:08:48.129 I/ReactNativeJS( 5619): [TTS] fetch#9 queued words=12
+04-20 16:08:48.225 I/ReactNativeJS( 5619): [TTS] fetch#10 queued words=9
+04-20 16:08:48.296 I/ReactNativeJS( 5619): [TTS] fetch#11 queued words=13
+04-20 16:08:48.323 I/ReactNativeJS( 5619): [TTS] fetch#12 queued words=20
+04-20 16:08:48.326 I/ReactNativeJS( 5619): [TTS] fetch#13 queued words=6
+04-20 16:08:48.749 I/ReactNativeJS( 5619): [TTS] fetch#14 queued words=49
+04-20 16:08:50.939 I/ReactNativeJS( 5619): [TTS] fetch#5 done in 3430ms
+04-20 16:08:50.939 I/ReactNativeJS( 5619): [TTS] fetch#6 start (waited 3428ms)
+04-20 16:08:51.772 I/ReactNativeJS( 5619): [TTS] fetch#6 done in 4261ms
+04-20 16:08:51.772 I/ReactNativeJS( 5619): [TTS] fetch#7 start (waited 4027ms)
+04-20 16:08:52.730 I/ReactNativeJS( 5619): [TTS] fetch#7 done in 4985ms
+04-20 16:08:52.730 I/ReactNativeJS( 5619): [TTS] fetch#8 start (waited 4782ms)
+04-20 16:08:53.855 I/ReactNativeJS( 5619): [TTS] fetch#8 done in 5907ms
+04-20 16:08:53.855 I/ReactNativeJS( 5619): [TTS] fetch#9 start (waited 5726ms)
+04-20 16:08:55.314 I/ReactNativeJS( 5619): [TTS] fetch#9 done in 7185ms
+04-20 16:08:55.314 I/ReactNativeJS( 5619): [TTS] fetch#10 start (waited 7089ms)
+04-20 16:08:56.365 I/ReactNativeJS( 5619): [TTS] fetch#10 done in 8140ms
+04-20 16:08:56.365 I/ReactNativeJS( 5619): [TTS] fetch#11 start (waited 8069ms)
+04-20 16:08:56.469 I/ReactNativeJS( 5619): [TTS] fetch#4 done in 8999ms
+04-20 16:08:56.469 I/ReactNativeJS( 5619): [TTS] fetch#12 start (waited 8146ms)
+04-20 16:08:57.590 I/ReactNativeJS( 5619): [TTS] fetch#11 done in 9294ms
+04-20 16:08:57.590 I/ReactNativeJS( 5619): [TTS] fetch#13 start (waited 9264ms)
+04-20 16:08:57.853 I/ReactNativeJS( 5619): [TTS] fetch#12 done in 9530ms
+04-20 16:08:57.853 I/ReactNativeJS( 5619): [TTS] fetch#14 start (waited 9104ms)
+04-20 16:08:58.533 I/ReactNativeJS( 5619): [TTS] fetch#13 done in 10207ms
+04-20 16:09:01.008 I/ReactNativeJS( 5619): [TTS] fetch#14 done in 12259ms
+04-20 16:09:04.686 W/ReactNativeJS( 5619): '[VA] watchdog tripped in status=', 'speaking', '— forcing recovery'
+04-20 16:09:04.691 I/ReactNativeJS( 5619): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:09:04.692 I/ReactNativeJS( 5619): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:09:05.830 I/ReactNativeJS( 5619): [REC] recorder.record() called, success
+04-20 16:09:05.831 I/ReactNativeJS( 5619): '[VA] resumeLoop startRecording returned', true
+04-20 16:09:07.619 I/ReactNativeJS( 5619): '[VA] speech armed metering=', '-30.2', 'ambient=', '-49.4'
+04-20 16:09:08.911 I/ReactNativeJS( 5619): '[VA] processRecording entry isProcessing=', false
+04-20 16:09:08.913 I/ReactNativeJS( 5619): [VA] reset detection state, ambient=-42
+04-20 16:09:09.003 I/ReactNativeJS( 5619): '[VA] stopRecording returned', 'uri'
+04-20 16:09:09.748 I/ReactNativeJS( 5619): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:09:09.749 I/ReactNativeJS( 5619): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:09:10.644 I/ReactNativeJS( 5619): [REC] recorder.record() called, success
+04-20 16:09:10.645 I/ReactNativeJS( 5619): '[VA] resumeLoop startRecording returned', true
+04-20 16:09:15.913 I/ReactNativeJS( 5619): '[VA] speech armed metering=', '-26.3', 'ambient=', '-53.5'
+04-20 16:09:16.162 I/ReactNativeJS( 5619): [TTS] play#0 done in 30031ms
+04-20 16:09:20.979 I/ReactNativeJS( 5619): '[VA] processRecording entry isProcessing=', false
+04-20 16:09:21.078 I/ReactNativeJS( 5619): [VA] reset detection state, ambient=-42
+04-20 16:09:21.081 I/ReactNativeJS( 5619): '[VA] stopRecording returned', 'uri'
+04-20 16:09:21.895 I/ReactNativeJS( 5619): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:09:21.895 I/ReactNativeJS( 5619): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:14:08.024 I/ReactNativeJS(17228): Running "main"
+04-20 16:14:08.532 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:14:11.546 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', false
+04-20 16:14:12.907 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:14:14.689 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-1.6', 'ambient=', '-47.3'
+04-20 16:14:17.084 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:14:17.180 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:14:17.200 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:14:17.860 I/ReactNativeJS(17228): '[memory] loaded system settings:', { assistant_name: 'R2' }
+04-20 16:14:17.869 I/ReactNativeJS(17228): [memory] loaded 6 memories (1 tasks)
+04-20 16:14:18.156 I/ReactNativeJS(17228): [calendar] loaded 6 events
+04-20 16:14:19.194 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=8
+04-20 16:14:19.194 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 1ms)
+04-20 16:14:20.103 I/ReactNativeJS(17228): [TTS] fetch#0 done in 910ms
+04-20 16:14:20.103 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:14:23.539 I/ReactNativeJS(17228): [TTS] play#0 done in 3436ms
+04-20 16:14:23.539 I/ReactNativeJS(17228): [TTS] drain complete, played=1 queued=1
+04-20 16:14:24.356 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:14:24.356 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:14:24.356 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:14:25.272 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:14:25.272 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:14:25.273 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:14:28.052 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-27.1', 'ambient=', '-49.0'
+04-20 16:14:29.126 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:14:29.128 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:14:29.217 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:14:29.950 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:14:29.950 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:14:30.816 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:14:30.816 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:14:32.393 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-23.6', 'ambient=', '-47.9'
+04-20 16:14:39.080 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:14:39.083 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:14:39.184 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:14:40.018 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:14:40.018 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:14:40.903 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:14:40.903 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:14:44.575 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-19.5', 'ambient=', '-46.4'
+04-20 16:14:45.753 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:14:45.758 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:14:45.856 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:14:47.353 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:14:47.353 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:14:48.208 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:14:48.208 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:14:59.149 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-23.5', 'ambient=', '-45.8'
+04-20 16:15:00.206 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:15:00.209 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:15:00.305 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:15:01.382 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:15:01.382 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:15:02.239 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:15:02.240 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:15:09.269 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-34.5', 'ambient=', '-45.2'
+04-20 16:15:11.426 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:15:11.520 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:15:11.524 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:15:12.134 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:15:12.134 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:15:12.971 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:15:12.971 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:15:16.072 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-31.8', 'ambient=', '-46.9'
+04-20 16:15:22.422 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:15:22.517 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:15:22.518 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:15:23.916 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=14
+04-20 16:15:23.917 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 1ms)
+04-20 16:15:24.048 I/ReactNativeJS(17228): [TTS] fetch#1 queued words=10
+04-20 16:15:24.048 I/ReactNativeJS(17228): [TTS] fetch#1 start (waited 0ms)
+04-20 16:15:24.056 I/ReactNativeJS(17228): [TTS] fetch#2 queued words=11
+04-20 16:15:25.084 I/ReactNativeJS(17228): [TTS] fetch#1 done in 1036ms
+04-20 16:15:25.084 I/ReactNativeJS(17228): [TTS] fetch#2 start (waited 1028ms)
+04-20 16:15:25.089 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1173ms
+04-20 16:15:25.089 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:15:26.196 I/ReactNativeJS(17228): [TTS] fetch#2 done in 2140ms
+04-20 16:15:29.753 I/ReactNativeJS(17228): [TTS] play#0 done in 4664ms
+04-20 16:15:29.753 I/ReactNativeJS(17228): [TTS] play#1 start
+04-20 16:15:33.104 I/ReactNativeJS(17228): [TTS] play#1 done in 3351ms
+04-20 16:15:33.104 I/ReactNativeJS(17228): [TTS] play#2 start
+04-20 16:15:36.847 I/ReactNativeJS(17228): [TTS] play#2 done in 3743ms
+04-20 16:15:36.847 I/ReactNativeJS(17228): [TTS] drain complete, played=3 queued=3
+04-20 16:15:37.664 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:15:37.665 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:15:37.665 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:15:38.523 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:15:38.524 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:15:38.524 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:15:39.915 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-2.9', 'ambient=', '-42.0'
+04-20 16:15:42.815 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:15:42.817 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:15:42.901 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:15:46.041 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=14
+04-20 16:15:46.041 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 0ms)
+04-20 16:15:47.292 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1251ms
+04-20 16:15:47.292 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:15:51.733 I/ReactNativeJS(17228): [TTS] play#0 done in 4441ms
+04-20 16:15:51.733 I/ReactNativeJS(17228): [TTS] drain complete, played=1 queued=1
+04-20 16:15:52.550 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:15:52.551 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:15:52.551 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:15:53.427 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:15:53.428 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:15:53.428 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:15:54.735 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-14.2', 'ambient=', '-42.0'
+04-20 16:16:01.403 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:16:01.516 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:16:01.520 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:16:04.577 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=6
+04-20 16:16:04.578 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 1ms)
+04-20 16:16:05.817 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1240ms
+04-20 16:16:05.817 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:16:08.872 I/ReactNativeJS(17228): [TTS] play#0 done in 3055ms
+04-20 16:16:08.872 I/ReactNativeJS(17228): [TTS] drain complete, played=1 queued=1
+04-20 16:16:09.689 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:16:09.689 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:16:09.690 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:16:10.543 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:16:10.543 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:16:10.543 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:16:12.590 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-27.3', 'ambient=', '-47.6'
+04-20 16:16:13.786 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:16:13.873 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:16:13.877 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:16:14.497 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:16:14.497 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:16:15.364 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:16:15.365 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:16:17.246 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-37.1', 'ambient=', '-47.5'
+04-20 16:16:18.437 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:16:18.519 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:16:18.522 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:16:19.618 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:16:19.618 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:16:20.493 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:16:20.493 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:16:33.539 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-30.3', 'ambient=', '-45.8'
+04-20 16:16:34.625 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:16:34.629 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:16:34.719 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:16:35.697 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:16:35.697 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:16:36.547 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:16:36.547 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:16:41.431 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-19.0', 'ambient=', '-45.7'
+04-20 16:16:47.016 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:16:47.105 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:16:47.108 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:16:49.611 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=10
+04-20 16:16:49.611 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 0ms)
+04-20 16:16:49.636 I/ReactNativeJS(17228): [TTS] fetch#1 queued words=15
+04-20 16:16:49.636 I/ReactNativeJS(17228): [TTS] fetch#1 start (waited 0ms)
+04-20 16:16:51.143 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1532ms
+04-20 16:16:51.143 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:16:51.227 I/ReactNativeJS(17228): [TTS] fetch#1 done in 1591ms
+04-20 16:16:55.782 I/ReactNativeJS(17228): [TTS] play#0 done in 4639ms
+04-20 16:16:55.783 I/ReactNativeJS(17228): [TTS] play#1 start
+04-20 16:16:59.984 I/ReactNativeJS(17228): [TTS] play#1 done in 4201ms
+04-20 16:16:59.984 I/ReactNativeJS(17228): [TTS] drain complete, played=2 queued=2
+04-20 16:17:00.801 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:17:00.801 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:17:00.801 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:17:01.708 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:17:01.708 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:17:01.708 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:17:03.094 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-25.9', 'ambient=', '-42.3'
+04-20 16:17:32.763 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:17:32.848 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:17:32.849 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:17:34.578 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:17:34.578 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:17:35.425 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:17:35.426 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:17:36.860 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-31.1', 'ambient=', '-41.5'
+04-20 16:17:38.156 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:17:38.255 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:17:38.257 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:17:39.077 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:17:39.078 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:17:39.917 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:17:39.917 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:17:41.178 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-19.9', 'ambient=', '-47.9'
+04-20 16:17:48.782 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:17:48.868 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:17:48.871 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:17:49.730 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:17:49.731 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:17:50.703 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:17:50.703 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:17:51.952 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-8.4', 'ambient=', '-47.9'
+04-20 16:17:55.110 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:17:55.241 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:17:55.252 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:17:56.653 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=14
+04-20 16:17:56.653 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 0ms)
+04-20 16:17:57.894 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1241ms
+04-20 16:17:57.894 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:18:02.654 I/ReactNativeJS(17228): [TTS] play#0 done in 4759ms
+04-20 16:18:02.654 I/ReactNativeJS(17228): [TTS] drain complete, played=1 queued=1
+04-20 16:18:03.464 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:18:03.464 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:18:03.464 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:18:04.524 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:18:04.525 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:18:04.525 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:18:05.808 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-2.7', 'ambient=', '-47.9'
+04-20 16:18:09.245 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:18:09.332 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:18:09.338 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:18:10.820 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=13
+04-20 16:18:10.820 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 0ms)
+04-20 16:18:12.221 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1401ms
+04-20 16:18:12.221 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:18:16.818 I/ReactNativeJS(17228): [TTS] play#0 done in 4597ms
+04-20 16:18:16.818 I/ReactNativeJS(17228): [TTS] drain complete, played=1 queued=1
+04-20 16:18:17.634 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:18:17.635 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:18:17.635 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:18:18.521 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:18:18.521 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:18:18.521 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:18:19.772 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-7.5', 'ambient=', '-47.9'
+04-20 16:18:25.056 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:18:25.135 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:18:25.141 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:18:36.956 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=9
+04-20 16:18:36.957 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 1ms)
+04-20 16:18:38.053 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1097ms
+04-20 16:18:38.053 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:18:42.024 I/ReactNativeJS(17228): [TTS] play#0 done in 3971ms
+04-20 16:18:42.024 I/ReactNativeJS(17228): [TTS] drain complete, played=1 queued=1
+04-20 16:18:42.840 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:18:42.840 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:18:42.841 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:18:43.711 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:18:43.711 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:18:43.711 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:18:44.957 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-1.8', 'ambient=', '-47.9'
+04-20 16:18:58.421 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:18:58.425 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:18:58.510 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:19:01.503 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=18
+04-20 16:19:01.503 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 0ms)
+04-20 16:19:01.505 I/ReactNativeJS(17228): [TTS] fetch#1 queued words=5
+04-20 16:19:01.506 I/ReactNativeJS(17228): [TTS] fetch#1 start (waited 2ms)
+04-20 16:19:03.102 I/ReactNativeJS(17228): [TTS] fetch#1 done in 1598ms
+04-20 16:19:03.165 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1662ms
+04-20 16:19:03.165 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:19:09.749 I/ReactNativeJS(17228): [TTS] play#0 done in 6584ms
+04-20 16:19:09.749 I/ReactNativeJS(17228): [TTS] play#1 start
+04-20 16:19:11.872 I/ReactNativeJS(17228): [TTS] play#1 done in 2123ms
+04-20 16:19:11.872 I/ReactNativeJS(17228): [TTS] drain complete, played=2 queued=2
+04-20 16:19:12.689 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:19:12.689 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:19:12.689 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:19:13.563 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:19:13.564 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:19:13.564 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:19:21.972 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-30.4', 'ambient=', '-46.3'
+04-20 16:19:23.041 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:19:23.121 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:19:23.123 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:19:23.486 I/ReactNativeJS(17228): [calendar] loaded 6 events
+04-20 16:19:25.593 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:19:25.593 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:19:26.460 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:19:26.460 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:19:29.199 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-17.4', 'ambient=', '-43.2'
+04-20 16:19:31.354 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:19:31.449 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:19:31.455 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:19:32.744 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:19:32.744 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:19:33.666 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:19:33.667 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:19:34.919 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-5.6', 'ambient=', '-47.9'
+04-20 16:19:38.983 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:19:39.079 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:19:39.083 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:19:40.229 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=4
+04-20 16:19:40.229 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 0ms)
+04-20 16:19:41.472 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1243ms
+04-20 16:19:41.473 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:19:43.552 I/ReactNativeJS(17228): [TTS] play#0 done in 2079ms
+04-20 16:19:43.553 I/ReactNativeJS(17228): [TTS] drain complete, played=1 queued=1
+04-20 16:19:44.361 I/ReactNativeJS(17228): '[VA] post-TTS, about to resumeLoop, isLooping=', true
+04-20 16:19:44.361 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:19:44.362 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:19:45.222 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:19:45.223 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:19:45.223 I/ReactNativeJS(17228): [VA] processRecording end, isProcessing reset
+04-20 16:19:46.624 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-22.3', 'ambient=', '-47.6'
+04-20 16:19:57.397 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:19:57.492 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:19:57.498 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:19:59.152 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=18
+04-20 16:19:59.152 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 0ms)
+04-20 16:19:59.352 I/ReactNativeJS(17228): [TTS] fetch#1 queued words=33
+04-20 16:19:59.352 I/ReactNativeJS(17228): [TTS] fetch#1 start (waited 0ms)
+04-20 16:19:59.479 I/ReactNativeJS(17228): [TTS] fetch#2 queued words=20
+04-20 16:19:59.534 I/ReactNativeJS(17228): [TTS] fetch#3 queued words=16
+04-20 16:20:00.904 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1752ms
+04-20 16:20:00.904 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:20:00.927 I/ReactNativeJS(17228): [TTS] fetch#2 start (waited 1448ms)
+04-20 16:20:02.558 I/ReactNativeJS(17228): [TTS] fetch#1 done in 3206ms
+04-20 16:20:02.558 I/ReactNativeJS(17228): [TTS] fetch#3 start (waited 3024ms)
+04-20 16:20:02.561 I/ReactNativeJS(17228): [TTS] fetch#2 done in 3082ms
+04-20 16:20:03.802 I/ReactNativeJS(17228): [TTS] fetch#3 done in 4268ms
+04-20 16:20:07.633 I/ReactNativeJS(17228): [TTS] play#0 done in 6729ms
+04-20 16:20:07.633 I/ReactNativeJS(17228): [TTS] play#1 start
+04-20 16:20:18.376 W/ReactNativeJS(17228): '[VA] watchdog tripped in status=', 'speaking', '— forcing recovery'
+04-20 16:20:18.384 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:20:18.384 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:20:19.248 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:20:19.248 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:20:22.147 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-22.3', 'ambient=', '-47.4'
+04-20 16:20:24.406 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:20:24.408 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:20:24.505 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:20:25.479 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:20:25.480 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:20:26.340 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:20:26.340 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:20:34.240 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-27.1', 'ambient=', '-46.6'
+04-20 16:20:37.649 I/ReactNativeJS(17228): [TTS] play#1 done in 30016ms
+04-20 16:20:44.701 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:20:44.709 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:20:44.832 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:20:46.769 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=18
+04-20 16:20:46.770 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 1ms)
+04-20 16:20:47.043 I/ReactNativeJS(17228): [TTS] fetch#1 queued words=15
+04-20 16:20:47.043 I/ReactNativeJS(17228): [TTS] fetch#1 start (waited 0ms)
+04-20 16:20:48.000 I/ReactNativeJS(17228): [TTS] fetch#2 queued words=53
+04-20 16:20:48.025 I/ReactNativeJS(17228): [TTS] fetch#3 queued words=18
+04-20 16:20:48.094 I/ReactNativeJS(17228): [TTS] fetch#4 queued words=6
+04-20 16:20:48.340 I/ReactNativeJS(17228): [TTS] fetch#1 done in 1297ms
+04-20 16:20:48.340 I/ReactNativeJS(17228): [TTS] fetch#2 start (waited 340ms)
+04-20 16:20:48.584 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1815ms
+04-20 16:20:48.584 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:20:48.614 I/ReactNativeJS(17228): [TTS] fetch#3 start (waited 589ms)
+04-20 16:20:50.165 I/ReactNativeJS(17228): [TTS] fetch#3 done in 2140ms
+04-20 16:20:50.165 I/ReactNativeJS(17228): [TTS] fetch#4 start (waited 2071ms)
+04-20 16:20:51.146 I/ReactNativeJS(17228): [TTS] fetch#4 done in 3052ms
+04-20 16:20:53.068 I/ReactNativeJS(17228): [TTS] fetch#2 done in 5068ms
+04-20 16:20:53.824 I/ReactNativeJS(17228): [TTS] play#0 done in 5240ms
+04-20 16:20:53.824 I/ReactNativeJS(17228): [TTS] play#1 start
+04-20 16:20:58.343 I/ReactNativeJS(17228): [TTS] play#1 done in 4519ms
+04-20 16:20:58.344 I/ReactNativeJS(17228): [TTS] play#2 start
+04-20 16:21:06.013 W/ReactNativeJS(17228): '[VA] watchdog tripped in status=', 'speaking', '— forcing recovery'
+04-20 16:21:06.021 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:21:06.021 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:21:07.030 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:21:07.031 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:21:11.580 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-19.0', 'ambient=', '-46.7'
+04-20 16:21:12.881 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:21:12.973 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:21:12.978 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:21:14.629 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:21:14.629 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:21:15.492 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:21:15.492 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:21:28.360 I/ReactNativeJS(17228): [TTS] play#2 done in 30016ms
+04-20 16:21:36.313 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-37.1', 'ambient=', '-47.8'
+04-20 16:21:37.504 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:21:37.601 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:21:37.604 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:21:39.205 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:21:39.205 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:21:40.069 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:21:40.069 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:21:42.080 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-32.0', 'ambient=', '-47.1'
+04-20 16:21:43.159 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:21:43.248 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:21:43.250 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:21:43.913 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:21:43.913 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:21:44.779 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:21:44.779 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:21:58.451 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-29.2', 'ambient=', '-47.1'
+04-20 16:22:08.019 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:22:08.109 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:22:08.117 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:22:11.351 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=16
+04-20 16:22:11.351 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 0ms)
+04-20 16:22:11.577 I/ReactNativeJS(17228): [TTS] fetch#1 queued words=45
+04-20 16:22:11.577 I/ReactNativeJS(17228): [TTS] fetch#1 start (waited 0ms)
+04-20 16:22:12.461 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1110ms
+04-20 16:22:12.461 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:22:14.132 I/ReactNativeJS(17228): [TTS] fetch#1 done in 2555ms
+04-20 16:22:30.564 W/ReactNativeJS(17228): '[VA] watchdog tripped in status=', 'speaking', '— forcing recovery'
+04-20 16:22:30.567 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:22:30.567 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:22:31.428 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:22:31.428 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:22:36.432 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-28.2', 'ambient=', '-52.1'
+04-20 16:22:42.473 I/ReactNativeJS(17228): [TTS] play#0 done in 30012ms
+04-20 16:22:46.945 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:22:47.025 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:22:47.028 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:22:47.917 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:22:47.917 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:22:48.774 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:22:48.774 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:22:52.653 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-26.8', 'ambient=', '-47.7'
+04-20 16:22:54.577 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:22:54.673 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:22:54.674 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:22:55.703 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:22:55.704 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:22:56.600 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:22:56.601 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:22:59.237 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-28.0', 'ambient=', '-51.0'
+04-20 16:23:00.425 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:23:00.510 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:23:00.515 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:23:01.111 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:23:01.112 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:23:01.967 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:23:01.967 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:23:07.183 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-38.3', 'ambient=', '-53.4'
+04-20 16:23:10.200 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:23:10.284 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:23:10.289 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:23:11.167 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:23:11.167 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:23:12.024 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:23:12.024 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:23:15.584 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-28.7', 'ambient=', '-52.2'
+04-20 16:23:30.559 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:23:30.638 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:23:30.643 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:23:31.645 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:23:31.645 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:23:32.494 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:23:32.494 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:23:44.875 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-43.1', 'ambient=', '-53.6'
+04-20 16:24:04.295 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:24:04.299 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:24:04.386 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:24:05.328 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:24:05.328 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:24:06.224 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:24:06.225 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:24:07.466 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-14.5', 'ambient=', '-47.9'
+04-20 16:24:18.334 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:24:18.344 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:24:18.479 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:24:19.169 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:24:19.169 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:24:20.282 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:24:20.283 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:24:27.769 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-25.5', 'ambient=', '-54.4'
+04-20 16:24:29.168 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:24:29.267 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:24:29.274 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:24:29.570 I/ReactNativeJS(17228): [calendar] loaded 6 events
+04-20 16:24:30.111 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:24:30.111 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:24:30.991 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:24:30.992 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:24:36.944 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-39.7', 'ambient=', '-52.0'
+04-20 16:24:38.233 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:24:38.331 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:24:38.333 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:24:39.135 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:24:39.135 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:24:40.019 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:24:40.020 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:24:45.153 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-40.2', 'ambient=', '-53.5'
+04-20 16:24:46.223 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:24:46.329 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:24:46.334 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:24:47.211 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:24:47.211 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:24:48.096 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:24:48.098 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:24:50.445 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-33.3', 'ambient=', '-49.3'
+04-20 16:24:51.519 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:24:51.522 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:24:51.612 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:24:52.343 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:24:52.343 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:24:53.221 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:24:53.222 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:24:59.206 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-14.4', 'ambient=', '-51.7'
+04-20 16:25:02.214 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:25:02.297 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:25:02.301 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:25:04.415 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:25:04.416 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:25:05.274 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:25:05.275 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:25:12.833 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-35.8', 'ambient=', '-53.9'
+04-20 16:25:14.884 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:25:14.975 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:25:14.978 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:25:16.601 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:25:16.601 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:25:17.488 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:25:17.489 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:25:21.144 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-29.0', 'ambient=', '-46.3'
+04-20 16:25:23.598 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:25:23.691 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:25:23.693 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:25:25.102 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:25:25.103 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:25:25.942 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:25:25.942 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:25:34.041 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-40.4', 'ambient=', '-50.9'
+04-20 16:25:35.116 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:25:35.119 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:25:35.214 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:25:37.597 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:25:37.597 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:25:38.454 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:25:38.454 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:25:43.518 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-8.3', 'ambient=', '-50.3'
+04-20 16:25:44.800 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:25:44.889 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:25:44.891 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:25:45.374 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:25:45.374 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:25:46.235 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:25:46.235 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:25:49.976 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-22.1', 'ambient=', '-45.8'
+04-20 16:25:52.556 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:25:52.558 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:25:52.659 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:25:53.567 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:25:53.567 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:25:54.397 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:25:54.397 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:26:00.654 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-18.0', 'ambient=', '-48.6'
+04-20 16:26:01.847 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:26:01.945 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:26:01.950 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:26:02.686 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:26:02.686 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:26:03.534 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:26:03.534 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:26:08.429 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-15.0', 'ambient=', '-52.9'
+04-20 16:26:09.605 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:26:09.702 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:26:09.708 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:26:10.363 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:26:10.363 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:26:11.227 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:26:11.227 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:26:15.434 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-22.2', 'ambient=', '-48.6'
+04-20 16:26:16.617 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:26:16.620 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:26:16.703 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:26:17.225 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:26:17.225 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:26:18.100 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:26:18.101 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:26:20.485 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-23.3', 'ambient=', '-43.7'
+04-20 16:26:21.544 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:26:21.548 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:26:21.631 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:26:22.550 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:26:22.550 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:26:23.443 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:26:23.443 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:26:25.124 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-22.2', 'ambient=', '-47.6'
+04-20 16:26:30.722 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:26:30.724 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:26:30.822 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:26:32.580 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:26:32.580 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:26:33.442 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:26:33.442 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:26:35.758 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-27.4', 'ambient=', '-49.7'
+04-20 16:26:36.941 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:26:36.943 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:26:37.037 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:26:38.007 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:26:38.007 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:26:38.876 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:26:38.876 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:26:42.634 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-17.4', 'ambient=', '-48.1'
+04-20 16:26:44.968 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:26:45.057 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:26:45.059 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:26:46.718 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:26:46.718 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:26:47.582 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:26:47.583 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:26:52.078 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-36.5', 'ambient=', '-48.3'
+04-20 16:26:53.162 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:26:53.256 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:26:53.257 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:26:54.702 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:26:54.702 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:26:55.534 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:26:55.535 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:26:58.337 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-32.5', 'ambient=', '-47.2'
+04-20 16:27:00.162 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:27:00.243 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:27:00.245 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:27:01.353 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:27:01.353 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:27:02.252 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:27:02.253 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:27:04.175 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-8.6', 'ambient=', '-49.0'
+04-20 16:27:06.856 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:27:06.943 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:27:06.945 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:27:07.813 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:27:07.813 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:27:08.668 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:27:08.668 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:27:12.181 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-17.7', 'ambient=', '-50.4'
+04-20 16:27:14.133 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:27:14.213 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:27:14.215 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:27:15.899 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:27:15.900 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:27:16.749 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:27:16.749 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:27:21.040 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-28.5', 'ambient=', '-50.8'
+04-20 16:27:23.497 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:27:23.591 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:27:23.595 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:27:24.501 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:27:24.501 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:27:25.350 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:27:25.350 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:27:26.637 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-36.6', 'ambient=', '-47.9'
+04-20 16:27:27.713 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:27:27.790 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:27:27.792 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:27:29.312 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:27:29.312 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:27:30.155 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:27:30.155 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:27:32.150 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-32.8', 'ambient=', '-50.4'
+04-20 16:27:33.235 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:27:33.238 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:27:33.318 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:27:34.024 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:27:34.025 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:27:34.867 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:27:34.868 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:27:36.612 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-14.6', 'ambient=', '-43.8'
+04-20 16:27:37.798 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:27:37.800 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:27:37.892 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:27:38.735 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:27:38.735 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:27:39.591 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:27:39.592 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:27:44.490 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-21.4', 'ambient=', '-53.2'
+04-20 16:28:02.166 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:28:02.255 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:28:02.257 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:28:03.616 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:28:03.616 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:28:04.459 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:28:04.460 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:28:12.411 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-43.1', 'ambient=', '-54.0'
+04-20 16:28:13.496 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:28:13.499 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:28:13.591 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:28:14.403 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:28:14.403 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:28:15.245 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:28:15.245 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:28:17.369 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-2.7', 'ambient=', '-48.2'
+04-20 16:28:21.146 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:28:21.243 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:28:21.250 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:28:22.971 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:28:22.971 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:28:23.820 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:28:23.821 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:28:36.657 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-21.4', 'ambient=', '-53.2'
+04-20 16:28:37.835 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:28:37.837 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:28:37.935 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:28:38.744 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:28:38.744 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:28:39.631 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:28:39.631 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:28:44.126 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-18.5', 'ambient=', '-52.4'
+04-20 16:28:45.400 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:28:45.480 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:28:45.483 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:28:46.625 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:28:46.625 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:28:47.493 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:28:47.493 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:28:53.808 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-33.3', 'ambient=', '-51.1'
+04-20 16:28:54.878 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:28:54.971 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:28:54.974 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:28:56.456 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:28:56.456 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:28:57.306 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:28:57.306 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:29:02.741 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-20.7', 'ambient=', '-52.5'
+04-20 16:29:04.037 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:29:04.151 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:29:04.151 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:29:04.957 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:29:04.957 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:29:05.814 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:29:05.814 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:29:08.153 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-15.6', 'ambient=', '-49.3'
+04-20 16:29:10.861 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:29:10.863 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:29:10.962 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:29:11.511 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:29:11.511 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:29:12.368 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:29:12.368 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:29:16.089 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-19.3', 'ambient=', '-48.6'
+04-20 16:29:17.371 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:29:17.509 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:29:17.525 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:29:18.174 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:29:18.174 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:29:19.174 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:29:19.175 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:29:23.180 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-19.4', 'ambient=', '-53.3'
+04-20 16:29:24.488 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:29:24.564 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:29:24.571 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:29:25.742 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:29:25.742 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:29:26.745 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:29:26.745 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:29:28.833 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-19.3', 'ambient=', '-49.6'
+04-20 16:29:31.315 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:29:31.405 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:29:31.407 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:29:31.719 I/ReactNativeJS(17228): [calendar] loaded 6 events
+04-20 16:29:32.089 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:29:32.089 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:29:32.958 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:29:32.959 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:29:36.633 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-22.1', 'ambient=', '-51.5'
+04-20 16:29:43.751 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:29:43.832 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:29:43.834 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:29:45.098 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:29:45.098 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:29:45.946 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:29:45.946 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:29:51.506 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-13.1', 'ambient=', '-52.7'
+04-20 16:29:55.921 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:29:55.923 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:29:56.010 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:29:58.501 I/ReactNativeJS(17228): [TTS] fetch#0 queued words=29
+04-20 16:29:58.501 I/ReactNativeJS(17228): [TTS] fetch#0 start (waited 0ms)
+04-20 16:29:58.594 I/ReactNativeJS(17228): [TTS] fetch#1 queued words=16
+04-20 16:29:58.594 I/ReactNativeJS(17228): [TTS] fetch#1 start (waited 0ms)
+04-20 16:29:58.892 I/ReactNativeJS(17228): [TTS] fetch#2 queued words=39
+04-20 16:29:59.219 I/ReactNativeJS(17228): [TTS] fetch#3 queued words=22
+04-20 16:29:59.230 I/ReactNativeJS(17228): [TTS] fetch#4 queued words=24
+04-20 16:29:59.982 I/ReactNativeJS(17228): [TTS] fetch#1 done in 1388ms
+04-20 16:29:59.983 I/ReactNativeJS(17228): [TTS] fetch#2 start (waited 1090ms)
+04-20 16:30:00.251 I/ReactNativeJS(17228): [TTS] fetch#0 done in 1750ms
+04-20 16:30:00.251 I/ReactNativeJS(17228): [TTS] play#0 start
+04-20 16:30:00.336 I/ReactNativeJS(17228): [TTS] fetch#3 start (waited 1117ms)
+04-20 16:30:01.829 I/ReactNativeJS(17228): [TTS] fetch#3 done in 2610ms
+04-20 16:30:01.829 I/ReactNativeJS(17228): [TTS] fetch#4 start (waited 2599ms)
+04-20 16:30:02.654 I/ReactNativeJS(17228): [TTS] fetch#2 done in 3762ms
+04-20 16:30:03.687 I/ReactNativeJS(17228): [TTS] fetch#4 done in 4457ms
+04-20 16:30:08.452 I/ReactNativeJS(17228): [TTS] play#0 done in 8201ms
+04-20 16:30:08.453 I/ReactNativeJS(17228): [TTS] play#1 start
+04-20 16:30:14.093 I/ReactNativeJS(17228): [TTS] play#1 done in 5640ms
+04-20 16:30:14.094 I/ReactNativeJS(17228): [TTS] play#2 start
+04-20 16:30:17.642 W/ReactNativeJS(17228): '[VA] watchdog tripped in status=', 'speaking', '— forcing recovery'
+04-20 16:30:17.647 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:30:17.648 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:30:18.556 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:30:18.556 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:30:26.027 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-22.6', 'ambient=', '-52.7'
+04-20 16:30:27.208 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:30:27.210 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:30:27.298 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:30:29.334 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:30:29.334 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:30:30.200 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:30:30.200 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:30:34.343 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-18.2', 'ambient=', '-51.9'
+04-20 16:30:44.127 I/ReactNativeJS(17228): [TTS] play#2 done in 30033ms
+04-20 16:30:44.137 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:30:44.237 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:30:44.239 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:30:45.303 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:30:45.304 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:30:46.192 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:30:46.192 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:30:52.255 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-39.3', 'ambient=', '-51.8'
+04-20 16:30:53.327 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:30:53.329 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:30:53.414 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:30:55.030 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:30:55.030 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:30:55.893 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:30:55.893 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:30:57.200 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-17.4', 'ambient=', '-42.0'
+04-20 16:30:59.123 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:30:59.125 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:30:59.215 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:31:00.415 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:31:00.415 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:31:01.260 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:31:01.260 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true
+04-20 16:31:04.529 I/ReactNativeJS(17228): '[VA] speech armed metering=', '-21.9', 'ambient=', '-48.8'
+04-20 16:31:05.920 I/ReactNativeJS(17228): '[VA] processRecording entry isProcessing=', false
+04-20 16:31:05.922 I/ReactNativeJS(17228): [VA] reset detection state, ambient=-42
+04-20 16:31:06.012 I/ReactNativeJS(17228): '[VA] stopRecording returned', 'uri'
+04-20 16:31:07.316 I/ReactNativeJS(17228): '[VA] resumeLoop entry isLooping=', true, 'mounted=', true
+04-20 16:31:07.316 I/ReactNativeJS(17228): '[REC] startRecording called, alreadyRecording=', false, 'hasBeenUsed=', true
+04-20 16:31:08.173 I/ReactNativeJS(17228): [REC] recorder.record() called, success
+04-20 16:31:08.173 I/ReactNativeJS(17228): '[VA] resumeLoop startRecording returned', true

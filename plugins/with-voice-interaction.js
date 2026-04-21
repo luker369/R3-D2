@@ -106,7 +106,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionSessionService
-import com.facebook.react.ReactApplication
+import android.util.Log
 import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class AssistInteractionSessionService : VoiceInteractionSessionService() {
@@ -118,24 +118,31 @@ class AssistInteractionSessionService : VoiceInteractionSessionService() {
 class AssistInteractionSession(context: Context) : VoiceInteractionSession(context) {
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
+        Log.d("R2Assist", "onShow fired, showFlags=\$showFlags")
 
-        // If the JS runtime is already up (R2 running in FGS), just poke the
-        // listen loop via a bridge event — do NOT launch MainActivity, so
-        // whatever app the user is in stays frontmost.
-        val reactCtx = try {
-            val app = context.applicationContext as? ReactApplication
-            app?.reactNativeHost?.reactInstanceManager?.currentReactContext
-        } catch (t: Throwable) { null }
+        // Authoritative warm-check: AudioStreamModule's static liveContext is
+        // populated by React itself when the module is constructed and cleared
+        // on invalidate(). The reactHost computed-property getter is unreliable
+        // in new arch — it can return a host whose currentReactContext is null
+        // even when JS is alive, which previously caused warm corner-swipes to
+        // be dropped.
+        val reactCtx = AudioStreamModule.currentReactContext()
+        Log.d("R2Assist", "AudioStreamModule.currentReactContext=\${if (reactCtx != null) "non-null" else "null"}")
 
         if (reactCtx != null) {
             try {
                 reactCtx
                     .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                     .emit("r2Assist", null)
-            } catch (_: Throwable) {}
+                Log.d("R2Assist", "emitted r2Assist event, staying in background")
+            } catch (t: Throwable) {
+                Log.d("R2Assist", "emit threw: \${t.javaClass.simpleName}: \${t.message}")
+            }
         } else {
-            // Cold start — no running JS yet, so bringing the app forward is
-            // the only way to boot R2.
+            // No live React context => process is genuinely cold. Only then is
+            // it safe to launch MainActivity; doing so when JS is alive would
+            // pop the UI to the foreground.
+            Log.d("R2Assist", "no live React context — true cold start, startActivity")
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
                 data = Uri.parse("r3d2://assist")

@@ -78,10 +78,11 @@ export type Message = {
 export async function transcribeAudio(audioUri: string): Promise<string> {
   const formData = new FormData();
 
+  const isWav = /\.wav(\?|$)/i.test(audioUri);
   formData.append('file', {
     uri: audioUri,
-    type: 'audio/m4a',
-    name: 'recording.m4a',
+    type: isWav ? 'audio/wav' : 'audio/m4a',
+    name: isWav ? 'recording.wav' : 'recording.m4a',
   } as any);
   formData.append('model', 'whisper-1');
   formData.append('language', 'en');

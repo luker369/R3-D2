@@ -14,13 +14,13 @@ module.exports = function withNotifeeForegroundTypes(config) {
 
     const existing = app.service.find((s) => s.$['android:name'] === NOTIFEE_SERVICE);
     if (existing) {
-      existing.$['android:foregroundServiceType'] = 'microphone|dataSync';
+      existing.$['android:foregroundServiceType'] = 'microphone';
       existing.$['tools:replace'] = 'android:foregroundServiceType';
     } else {
       app.service.push({
         $: {
           'android:name': NOTIFEE_SERVICE,
-          'android:foregroundServiceType': 'microphone|dataSync',
+          'android:foregroundServiceType': 'microphone',
           'tools:replace': 'android:foregroundServiceType',
         },
       });

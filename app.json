@@ -49,7 +49,7 @@
         {
           "action": "android.intent.action.VIEW",
           "data": {
-            "scheme": "com.googleusercontent.apps.823254735040-41ndiok8ln02kcl9thubkj33sd8sh7a1"
+            "scheme": "com.googleusercontent.apps.823254735040-0uo2mnrd0mc0fiv7bff95jo46uaegdtp"
           },
           "category": [
             "android.intent.category.DEFAULT",

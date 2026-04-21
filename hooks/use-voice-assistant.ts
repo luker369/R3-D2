@@ -201,9 +201,15 @@ export function useVoiceAssistant() {
   const appWasInBackgroundRef = useRef(false);
 
   // Google OAuth — triggered by voice command ("connect Gmail", "sign into Google")
-  const promptGoogleSignIn = useGoogleSignIn(() => {
-    if (!mounted.current) return;
-    speakAndFinish("Google connected. Gmail and calendar access ready.");
+  const promptGoogleSignIn = useGoogleSignIn({
+    onConnected: () => {
+      if (!mounted.current) return;
+      speakAndFinish("Google connected. Gmail and calendar access ready.");
+    },
+    onError: (msg) => {
+      if (!mounted.current) return;
+      setError(`Google sign-in: ${msg}`);
+    },
   });
 
   // Auto-start listening after startup sound finishes

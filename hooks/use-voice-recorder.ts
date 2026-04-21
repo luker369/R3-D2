@@ -9,82 +9,126 @@
  * watches this value and stops recording after sustained silence.
  */
 
-import { useState, useRef } from 'react';
 import {
-  AudioModule,
-  useAudioRecorder,
-  useAudioRecorderState,
-  RecordingPresets,
-  setAudioModeAsync,
-} from 'expo-audio';
+    AudioModule,
+    RecordingPresets,
+    setAudioModeAsync,
+    useAudioRecorder,
+    useAudioRecorderState,
+} from "expo-audio";
+import { useCallback, useRef, useState } from "react";
 
 const METERING_INTERVAL_MS = 100; // poll 10× per second
+const NATIVE_CALL_TIMEOUT_MS = 3000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(`[useVoiceRecorder] ${label} timed out after ${ms}ms`),
+          ),
+        ms,
+      ),
+    ),
+  ]);
+}
 
 export function useVoiceRecorder() {
   const [isRecording, setIsRecording] = useState(false);
-  // Ref mirrors isRecording but is synchronous — avoids stale-closure races
-  // where stopRecording is called before React has committed the state update.
   const isRecordingRef = useRef(false);
+  const hasBeenUsed = useRef(false);
 
   const recorder = useAudioRecorder({
     ...RecordingPresets.HIGH_QUALITY,
     isMeteringEnabled: true,
   });
 
-  // Reactive state that updates every METERING_INTERVAL_MS while recording.
-  // recorderState.metering is the current audio level in dB (negative; louder = closer to 0).
   const recorderState = useAudioRecorderState(recorder, METERING_INTERVAL_MS);
 
-  async function startRecording(): Promise<boolean> {
+  const startRecording = useCallback(async (): Promise<boolean> => {
+    console.log(
+      "[REC] startRecording called, alreadyRecording=",
+      isRecordingRef.current,
+      "hasBeenUsed=",
+      hasBeenUsed.current,
+    );
     if (isRecordingRef.current) return true;
 
     const { granted } = await AudioModule.requestRecordingPermissionsAsync();
     if (!granted) {
-      console.warn('[useVoiceRecorder] Microphone permission denied.');
+      console.warn("[useVoiceRecorder] Microphone permission denied.");
       return false;
     }
 
     try {
       await setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+        allowsRecording: true,
+        playsInSilentMode: true,
+        interruptionMode: "duckOthers",
+        shouldRouteThroughEarpiece: false,
+        /** Keeps session usable when switching apps (esp. with Android FGS in dev builds). */
+        shouldPlayInBackground: true,
+        allowsBackgroundRecording: true,
       });
-      // Small gap lets Android release the TTS audio session before re-arming the mic
-      await new Promise<void>(r => setTimeout(r, 150));
-      await recorder.prepareToRecordAsync();
+
+      if (hasBeenUsed.current) {
+        await new Promise<void>((r) => setTimeout(r, 600));
+      }
+
+      try {
+        await withTimeout(
+          recorder.prepareToRecordAsync(),
+          NATIVE_CALL_TIMEOUT_MS,
+          "prepare",
+        );
+      } catch (prepareErr) {
+        console.warn(
+          "[useVoiceRecorder] prepare failed, retrying:",
+          prepareErr,
+        );
+        await new Promise<void>((r) => setTimeout(r, 500));
+        await withTimeout(
+          recorder.prepareToRecordAsync(),
+          NATIVE_CALL_TIMEOUT_MS,
+          "prepare-retry",
+        );
+      }
       recorder.record();
+      hasBeenUsed.current = true;
+      console.log("[REC] recorder.record() called, success");
     } catch (e) {
-      console.warn('[useVoiceRecorder] Failed to start recording:', e);
+      console.warn("[useVoiceRecorder] Failed to start recording:", e);
       return false;
     }
 
     isRecordingRef.current = true;
     setIsRecording(true);
     return true;
-  }
+  }, [recorder]);
 
-  async function stopRecording(): Promise<string | null> {
+  const stopRecording = useCallback(async (): Promise<string | null> => {
     if (!isRecordingRef.current) return null;
     isRecordingRef.current = false;
     setIsRecording(false);
 
     try {
-      await recorder.stop();
+      await withTimeout(recorder.stop(), NATIVE_CALL_TIMEOUT_MS, "stop");
     } catch (e) {
-      console.warn('[useVoiceRecorder] stop() failed — recorder was not in a stoppable state:', e);
+      console.warn("[useVoiceRecorder] stop() failed:", e);
       return null;
     }
 
     const uri = recorder.uri;
     if (!uri) {
-      console.warn('[useVoiceRecorder] No URI after stop.');
+      console.warn("[useVoiceRecorder] No URI after stop.");
       return null;
     }
 
     return uri;
-  }
+  }, [recorder]);
 
   return {
     startRecording,

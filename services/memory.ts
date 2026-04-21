@@ -204,7 +204,7 @@ export async function extractAndSaveMemory(
   ];
 
   try {
-    const result = await getChatResponse(prompt, undefined, undefined, 'gpt-5.4');
+    const result = await getChatResponse(prompt, undefined, undefined, 'gpt-5.4-mini');
 
     if (!result || result.trim() === 'null') return;
 

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "R2-R3",
-    "slug": "R2-R3",
+    "slug": "R3-D2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,10 +9,14 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "package": "com.lukesterling.r3d2",
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -24,16 +28,33 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.READ_CALENDAR"
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
       ],
       "intentFilters": [
         {
           "action": "android.intent.action.ASSIST",
-          "category": ["android.intent.category.DEFAULT"]
+          "category": [
+            "android.intent.category.DEFAULT"
+          ]
         },
         {
           "action": "android.intent.action.VOICE_ASSIST",
-          "category": ["android.intent.category.DEFAULT"]
+          "category": [
+            "android.intent.category.DEFAULT"
+          ]
+        },
+        {
+          "action": "android.intent.action.VIEW",
+          "data": {
+            "scheme": "com.googleusercontent.apps.823254735040-41ndiok8ln02kcl9thubkj33sd8sh7a1"
+          },
+          "category": [
+            "android.intent.category.DEFAULT",
+            "android.intent.category.BROWSABLE"
+          ]
         }
       ]
     },
@@ -42,6 +63,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-router",
       [
         "expo-splash-screen",
@@ -66,7 +88,10 @@
         {
           "calendarPermission": "Allow R3-D2 to read your calendar for scheduling assistance."
         }
-      ]
+      ],
+      "./plugins/with-voice-interaction",
+      "./plugins/with-notifee-foreground-types",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -77,6 +102,7 @@
       "eas": {
         "projectId": "e603f694-4be0-4841-8f68-b9299db058a0"
       }
-    }
+    },
+    "owner": "your_excellency"
   }
 }

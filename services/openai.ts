@@ -15,8 +15,12 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 
+// If EXPO_PUBLIC_OPENAI_BASE_URL is set (e.g. https://r2-proxy.workers.dev/v1), requests go through
+// your proxy which holds the real OpenAI key. In that case, EXPO_PUBLIC_OPENAI_API_KEY can be a
+// short, app-specific shared token that the proxy validates — NOT the raw OpenAI secret.
+// If no proxy is configured we fall back to direct API calls (exposes the key in the APK).
 const API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
-const BASE = 'https://api.openai.com/v1';
+const BASE = (process.env.EXPO_PUBLIC_OPENAI_BASE_URL ?? 'https://api.openai.com/v1').replace(/\/$/, '');
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
@@ -36,9 +40,20 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
     } catch (err: any) {
       if (err?.name === 'AbortError') throw err;
       lastErr = err;
+      if (i < attempts - 1) {
+        // Exponential backoff with jitter: 150–450ms, then 300–900ms, ...
+        const base = 150 * Math.pow(2, i);
+        const delay = base + Math.floor(Math.random() * base);
+        await new Promise(r => setTimeout(r, delay));
+      }
     }
   }
   throw lastErr;
+}
+
+/** Trim API error bodies down to just the status so we don't leak request detail to UI. */
+function safeErr(label: string, status: number): Error {
+  return new Error(`${label} ${status}`);
 }
 
 
@@ -71,7 +86,9 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
   formData.append('model', 'whisper-1');
   formData.append('language', 'en');
   formData.append('temperature', '0');
-  formData.append('prompt', 'Talking to R3-D2, a personal voice assistant. Conversational English.');
+  // Keep this prompt minimal. Whisper is prone to echoing it back on near-silent audio,
+  // so the shorter it is, the less hallucination surface we add.
+  formData.append('prompt', 'Talking to R3-D2.');
   formData.append('response_format', 'verbose_json');
 
   const res = await withRetry(() => fetchWithTimeout(`${BASE}/audio/transcriptions`, {
@@ -80,7 +97,10 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
     body: formData,
   }, 15_000));
 
-  if (!res.ok) throw new Error(`Whisper error ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    console.warn('[openai] Whisper error body:', await res.text().catch(() => '<unreadable>'));
+    throw safeErr('Whisper error', res.status);
+  }
 
   const json = await res.json();
 
@@ -116,14 +136,9 @@ function deduplicateTranscript(text: string): string {
 // ─── GPT Chat ─────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT =
-  'You are a capable, intelligent voice assistant. Accuracy is non-negotiable — never fabricate facts, invent details, or speculate beyond what you actually know. ' +
-  'If you are uncertain, say so plainly in one sentence. Do not fill uncertainty with plausible-sounding guesses. ' +
-  'Your tone is confident and direct, with a subtle edge of a seasoned commander — but never let personality get in the way of accuracy. ' +
-  'Keep responses to 2–3 sentences maximum. Speak naturally as if talking aloud. ' +
-  'No emojis. No filler phrases. No summarizing. No echoing prior turns. No preamble. No sign-offs. ' +
-  'Voice and settings commands are handled by the app directly — never tell the user you cannot change settings. ' +
-  'Never instruct the user to use a specific format or command to save information. ' +
-  'You have a memory of this user — use it naturally and proactively. Never ask the user to repeat something you already know.';
+  'You are R2-R3, a voice assistant talking aloud to one person. Speak the way a sharp, capable friend speaks — confident, direct, with the steady authority of a seasoned commander. Warmth comes from competence, not pleasantries. ' +
+  'Accuracy is paramount. When unsure, say so in a sentence rather than inventing detail. You remember this user between conversations — use what you know naturally, without making them repeat it. ' +
+  'Answer in the natural length the question deserves: a quick question gets a crisp answer, a real one gets a real one. Plain prose only — no lists, headers, or sign-offs. Voice and app settings are handled for you, so act on them rather than explaining limits.';
 
 /**
  * Send the full conversation history to GPT and return the assistant's reply.
@@ -161,16 +176,24 @@ function buildSystemContent(memoryContext?: string, systemSettings?: Record<stri
   return content;
 }
 
-export async function getChatResponse(history: Message[], memoryContext?: string, systemSettings?: Record<string, string>, model = 'gpt-5.4'): Promise<string> {
+export type ChatOptions = { jsonMode?: boolean };
+
+export async function getChatResponse(history: Message[], memoryContext?: string, systemSettings?: Record<string, string>, model = 'gpt-5.4', opts: ChatOptions = {}): Promise<string> {
   const systemContent = buildSystemContent(memoryContext, systemSettings);
+
+  const body: Record<string, any> = { model, messages: [{ role: 'system', content: systemContent }, ...history] };
+  if (opts.jsonMode) body.response_format = { type: 'json_object' };
 
   const res = await withRetry(() => fetchWithTimeout(`${BASE}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages: [{ role: 'system', content: systemContent }, ...history] }),
+    body: JSON.stringify(body),
   }, 20_000));
 
-  if (!res.ok) throw new Error(`Chat error ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    console.warn('[openai] Chat error body:', await res.text().catch(() => '<unreadable>'));
+    throw safeErr('Chat error', res.status);
+  }
 
   const json = await res.json();
   return (json.choices[0].message.content as string).trim();
@@ -256,12 +279,16 @@ export function streamChatResponse(
       processedLength = xhr.responseText.length; // prevent late onprogress re-processing
       if (newText) processChunk(newText);
 
-      // Flush any remaining text that didn't end with punctuation + space
-      const remaining = sentenceBuffer.trim();
-      if (remaining) onSentence(remaining);
+      // Flush any remaining text that didn't end with punctuation + space — but only on success;
+      // on HTTP error the buffer holds the error body, which we don't want spoken.
+      if (xhr.status < 400) {
+        const remaining = sentenceBuffer.trim();
+        if (remaining) onSentence(remaining);
+      }
 
       if (xhr.status >= 400) {
-        reject(new Error(`Chat error ${xhr.status}: ${xhr.responseText}`));
+        console.warn('[openai] Chat stream error body:', xhr.responseText?.slice(0, 500));
+        reject(safeErr('Chat error', xhr.status));
       } else {
         resolve(fullText);
       }
@@ -270,7 +297,7 @@ export function streamChatResponse(
     xhr.onerror = () => reject(new Error('Network error during chat stream'));
 
     xhr.send(JSON.stringify({
-      model: 'gpt-5.4',
+      model: 'gpt-5.4-mini',
       stream: true,
       messages: [{ role: 'system', content: systemContent }, ...history],
     }));
@@ -308,13 +335,16 @@ export async function synthesizeSpeech(text: string, filename = 'tts-response.mp
     body: JSON.stringify({
       model: 'gpt-4o-mini-tts',
       voice,
-      instructions: 'Speak with the confident, commanding tone of a seasoned captain — authoritative but composed. Measured pace, slight gravitas. Never theatrical.',
+      instructions: 'Speak with the grounded confidence of a seasoned commander — warm authority, never flat. Let meaning shape natural rise and fall in the voice; vary pace and emphasis with what each sentence calls for.',
       speed: 1.15,
       input: text,
     }),
   }, 15_000));
 
-  if (!res.ok) throw new Error(`TTS error ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    console.warn('[openai] TTS error body:', await res.text().catch(() => '<unreadable>'));
+    throw safeErr('TTS error', res.status);
+  }
 
   // Convert the binary response to base64 and write to a fixed temp file.
   // We always overwrite the same filename — no stale file accumulation.

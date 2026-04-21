@@ -1,8 +1,8 @@
 /**
  * services/google-calendar.ts
  *
- * Reads events from the device calendar (synced with Google Calendar).
- * No OAuth needed — uses expo-calendar with a READ_CALENDAR permission.
+ * Reads and writes events on the device calendar (synced with Google Calendar).
+ * No OAuth needed — uses expo-calendar with READ_CALENDAR / WRITE_CALENDAR permissions.
  */
 
 import * as Calendar from 'expo-calendar';
@@ -12,16 +12,20 @@ const CACHE_TTL_MS = 5 * 60_000;
 
 let permissionGranted: boolean | null = null;
 
+async function ensurePermission(): Promise<boolean> {
+  if (permissionGranted === null) {
+    const { status } = await Calendar.requestCalendarPermissionsAsync();
+    permissionGranted = status === 'granted';
+  }
+  return permissionGranted;
+}
+
 export async function fetchCalendarContext(daysAhead = 30): Promise<string> {
   if (calendarCached && Date.now() - calendarCached.fetchedAt < CACHE_TTL_MS) {
     return calendarCached.text;
   }
 
-  if (permissionGranted === null) {
-    const { status } = await Calendar.requestCalendarPermissionsAsync();
-    permissionGranted = status === 'granted';
-  }
-  if (!permissionGranted) return '';
+  if (!(await ensurePermission())) return '';
 
   const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
   const ids = calendars.map(c => c.id);
@@ -51,6 +55,57 @@ export async function fetchCalendarContext(daysAhead = 30): Promise<string> {
 
 export function invalidateCalendarCache(): void {
   calendarCached = null;
+}
+
+export type CreateEventInput = {
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  allDay?: boolean;
+  location?: string;
+  notes?: string;
+};
+
+export type CreateEventResult =
+  | { ok: true; eventId: string; calendarTitle: string }
+  | { ok: false; reason: 'permission' | 'no_calendar' | 'error'; message: string };
+
+export async function createCalendarEvent(input: CreateEventInput): Promise<CreateEventResult> {
+  if (!(await ensurePermission())) {
+    return { ok: false, reason: 'permission', message: 'Calendar permission denied.' };
+  }
+
+  try {
+    const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+    const writable = calendars.filter(c => c.allowsModifications);
+    if (writable.length === 0) {
+      return { ok: false, reason: 'no_calendar', message: 'No writable calendar found.' };
+    }
+
+    // Prefer the primary Google calendar, then any "owner" calendar, else the first writable.
+    const isOwner = (c: Calendar.Calendar) => String(c.accessLevel).toLowerCase() === 'owner';
+    const preferred =
+      writable.find(c => isOwner(c) && c.source?.name?.toLowerCase().includes('google')) ??
+      writable.find(isOwner) ??
+      writable[0];
+
+    const eventId = await Calendar.createEventAsync(preferred.id, {
+      title: input.title,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      allDay: input.allDay ?? false,
+      location: input.location,
+      notes: input.notes,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+
+    invalidateCalendarCache();
+    console.log(`[calendar] created event "${input.title}" on "${preferred.title}" id=${eventId}`);
+    return { ok: true, eventId, calendarTitle: preferred.title };
+  } catch (e: any) {
+    console.warn('[calendar] createEvent failed:', e);
+    return { ok: false, reason: 'error', message: e?.message ?? String(e) };
+  }
 }
 
 function formatEvent(e: Calendar.Event): string {

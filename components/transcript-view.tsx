@@ -33,8 +33,11 @@ export function TranscriptView({ entries }: Props) {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     paddingHorizontal: 20,
     paddingTop: 48,
+    paddingBottom: 12,
+    justifyContent: 'flex-end',
     gap: 12,
   },
   bubble: {

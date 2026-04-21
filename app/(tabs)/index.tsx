@@ -1,4 +1,6 @@
+import { useCallback } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import LottieView from 'lottie-react-native';
@@ -6,9 +8,19 @@ import { AnimatedBackground } from '@/components/animated-background';
 import { useVoiceAssistant } from '@/hooks/use-voice-assistant';
 import { ListenButton } from '@/components/listen-button';
 import { TranscriptView } from '@/components/transcript-view';
+import { R2_CHIRP_ON_EVERY_HOME_FOCUS } from '@/lib/r2-chirp-config';
+import { playR2Chirp } from '@/lib/r2-chirp';
 
 export default function HomeScreen() {
   const { status, transcript, error, looping, handlePress, pendingImage, setPendingImage } = useVoiceAssistant();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!R2_CHIRP_ON_EVERY_HOME_FOCUS) return;
+      const cleanup = playR2Chirp();
+      return cleanup;
+    }, []),
+  );
 
   async function pickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -40,8 +52,6 @@ export default function HomeScreen() {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
-
-      <View style={styles.spacer} />
 
       <View style={styles.bottomRow}>
         <TouchableOpacity style={styles.cameraBtn} onPress={pickImage}>
@@ -89,9 +99,6 @@ const styles = StyleSheet.create({
     color: '#FCD34D',
     fontSize: 13,
     textAlign: 'center',
-  },
-  spacer: {
-    flex: 1,
   },
   bottomRow: {
     flexDirection: 'row',

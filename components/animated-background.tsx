@@ -5,6 +5,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   Easing,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 type BlobConfig = {
@@ -28,7 +29,7 @@ const BLOBS: BlobConfig[] = [
   { a: 3, b: 5, delta: Math.PI/3, radiusX: 140, radiusY: 100, centerX: 190, centerY: 350, size: 260, baseHue: 40,  hueSpeed: 20, speed: 0.31 },
 ];
 
-function useBlobStyle(config: BlobConfig, time: Animated.SharedValue<number>) {
+function useBlobStyle(config: BlobConfig, time: SharedValue<number>) {
   return useAnimatedStyle(() => {
     'worklet';
     const t = time.value;

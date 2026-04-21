@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { TranscriptEntry } from '@/hooks/use-voice-assistant';
 
 type Props = {
@@ -6,39 +7,63 @@ type Props = {
 };
 
 export function TranscriptView({ entries }: Props) {
-  const lastUser      = [...entries].reverse().find(e => e.role === 'user');
-  const lastAssistant = [...entries].reverse().find(e => e.role === 'assistant');
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    // Defer so layout has a chance to measure the new bubble before we scroll.
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 16);
+    return () => clearTimeout(t);
+  }, [entries.length, entries[entries.length - 1]?.text]);
+
+  if (entries.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Tap the button and start talking.</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {lastAssistant && (
-        <View style={[styles.bubble, styles.assistantBubble]}>
-          <Text selectable style={styles.text}>{lastAssistant.text}</Text>
-        </View>
-      )}
-      {lastUser && (
-        <View style={[styles.bubble, styles.userBubble]}>
-          {lastUser.imageUri && (
-            <Image source={{ uri: lastUser.imageUri }} style={styles.image} resizeMode="cover" />
+    <ScrollView
+      ref={scrollRef}
+      style={styles.scroll}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {entries.map((e) => (
+        <View
+          key={e.id}
+          style={[styles.bubble, e.role === 'assistant' ? styles.assistantBubble : styles.userBubble]}
+        >
+          {e.imageUri && (
+            <Image source={{ uri: e.imageUri }} style={styles.image} resizeMode="cover" />
           )}
-          {lastUser.text ? <Text selectable style={styles.text}>{lastUser.text}</Text> : null}
+          {e.text ? <Text selectable style={styles.text}>{e.text}</Text> : null}
         </View>
-      )}
-      {!lastAssistant && !lastUser && (
-        <Text style={styles.emptyText}>Tap the button and start talking.</Text>
-      )}
-    </View>
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 48,
     paddingBottom: 12,
     justifyContent: 'flex-end',
     gap: 12,
+  },
+  emptyContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    justifyContent: 'flex-end',
   },
   bubble: {
     padding: 14,

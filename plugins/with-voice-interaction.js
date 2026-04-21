@@ -120,36 +120,27 @@ class AssistInteractionSession(context: Context) : VoiceInteractionSession(conte
         super.onShow(args, showFlags)
         Log.d("R2Assist", "onShow fired, showFlags=\$showFlags")
 
-        // Authoritative warm-check: AudioStreamModule's static liveContext is
-        // populated by React itself when the module is constructed and cleared
-        // on invalidate(). The reactHost computed-property getter is unreliable
-        // in new arch — it can return a host whose currentReactContext is null
-        // even when JS is alive, which previously caused warm corner-swipes to
-        // be dropped.
+        // Corner swipe is treated as an explicit UI launch request — always
+        // foreground MainActivity, warm or cold. This is the ONLY site in the
+        // app that launches MainActivity, so UI promotion remains scoped to the
+        // assist gesture (no voice-pipeline or background event can surface it).
         val reactCtx = AudioStreamModule.currentReactContext()
-        Log.d("R2Assist", "AudioStreamModule.currentReactContext=\${if (reactCtx != null) "non-null" else "null"}")
+        Log.d(
+            "R2Assist",
+            "AudioStreamModule.currentReactContext=" +
+                "\${if (reactCtx != null) "non-null (warm)" else "null (cold)"} — launching MainActivity"
+        )
 
-        if (reactCtx != null) {
-            try {
-                reactCtx
-                    .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                    .emit("r2Assist", null)
-                Log.d("R2Assist", "emitted r2Assist event, staying in background")
-            } catch (t: Throwable) {
-                Log.d("R2Assist", "emit threw: \${t.javaClass.simpleName}: \${t.message}")
-            }
-        } else {
-            // No live React context => process is genuinely cold. Only then is
-            // it safe to launch MainActivity; doing so when JS is alive would
-            // pop the UI to the foreground.
-            Log.d("R2Assist", "no live React context — true cold start, startActivity")
-            val intent = Intent(context, MainActivity::class.java).apply {
-                action = Intent.ACTION_VIEW
-                data = Uri.parse("r3d2://assist")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            context.startActivity(intent)
+        // URL uses a query string instead of a path so expo-router resolves
+        // it to the home route (tabs) instead of looking for a `/assist` route
+        // file. The "assist" marker is preserved in the query so the JS
+        // Linking handler can still detect it and arm the listener.
+        val intent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            data = Uri.parse("r3d2:///?assist=1")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
+        context.startActivity(intent)
         hide()
     }
 }

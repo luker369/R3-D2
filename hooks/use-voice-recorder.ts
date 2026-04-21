@@ -56,7 +56,10 @@ export function useVoiceRecorder() {
   }, []);
 
   const stopRecording = useCallback(async (): Promise<string | null> => {
-    if (!isRecordingRef.current) return null;
+    if (!isRecordingRef.current) {
+      console.log("[REC] stopRecording called while not recording — no-op");
+      return null;
+    }
     isRecordingRef.current = false;
     setIsRecording(false);
 

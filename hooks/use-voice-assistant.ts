@@ -213,10 +213,12 @@ export function useVoiceAssistant() {
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (!mounted.current) return;
+      console.log("[VA] auto-start firing (3s post-mount)");
       isLooping.current = true;
       setLooping(true);
       await startForegroundService();
       const started = await startRecording();
+      console.log("[VA] auto-start startRecording =>", started);
       if (mounted.current) setStatus(started ? "listening" : "idle");
       if (!started) {
         isLooping.current = false;
@@ -1280,7 +1282,13 @@ export function useVoiceAssistant() {
   // ── Button handler ─────────────────────────────────────────────────────────
 
   const handlePress = useCallback(async () => {
+    console.log(
+      "[VA] handlePress entry status=", status,
+      "looping=", looping,
+      "isLooping=", isLooping.current,
+    );
     if (status === "speaking" || status === "processing") {
+      console.log("[VA] handlePress branch: interrupt-and-resume");
       // Interrupt mid-response and jump straight back to listening
       interrupt();
       if (isLooping.current) {
@@ -1289,6 +1297,7 @@ export function useVoiceAssistant() {
         if (mounted.current) setStatus("idle");
       }
     } else if (looping) {
+      console.log("[VA] handlePress branch: stop-loop");
       // Stop the loop entirely
       isLooping.current = false;
       setLooping(false);
@@ -1297,6 +1306,7 @@ export function useVoiceAssistant() {
       setStatus("idle");
       stopForegroundService();
     } else if (status === "idle" || status === "error") {
+      console.log("[VA] handlePress branch: start-loop");
       // Start the loop
       isLooping.current = true;
       setLooping(true);
@@ -1321,16 +1331,24 @@ export function useVoiceAssistant() {
   const ensureListeningRef = useRef<() => void>(() => {});
   ensureListeningRef.current = () => {
     const s = statusRef.current;
+    console.log(
+      "[VA] ensureListening entry status=", s,
+      "isLooping=", isLooping.current,
+      "isRecording=", isRecordingRef.current,
+    );
     if (s === "speaking" || s === "processing") {
+      console.log("[VA] ensureListening branch: interrupt+resume");
       interrupt();
       if (isLooping.current) {
         void resumeLoopRef.current();
         return;
       }
     } else if (s === "listening") {
+      console.log("[VA] ensureListening branch: already listening — no-op");
       return;
     }
     const needsStart = !isLooping.current;
+    console.log("[VA] ensureListening branch: start (needsStart=", needsStart, ")");
     if (needsStart) {
       isLooping.current = true;
       setLooping(true);
@@ -1351,6 +1369,7 @@ export function useVoiceAssistant() {
 
   useEffect(() => {
     const onUrl = (url: string | null | undefined) => {
+      console.log("[VA] Linking URL received:", url);
       if (url && /assist/i.test(url)) ensureListeningRef.current();
     };
     Linking.getInitialURL().then(onUrl).catch(() => {});
@@ -1358,6 +1377,7 @@ export function useVoiceAssistant() {
     // Native AssistInteractionSession emits this when R2 is already running
     // so it can respond to the assist gesture without popping to the front.
     const assistSub = DeviceEventEmitter.addListener("r2Assist", () => {
+      console.log("[VA] r2Assist bridge event received");
       ensureListeningRef.current();
     });
     return () => {

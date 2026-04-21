@@ -16,6 +16,8 @@ type Native = {
 const native = (NativeModules as { AudioStreamModule?: Native })
   .AudioStreamModule;
 
+const TAG = "[AudioStream]";
+
 export type AudioFrame = { dbfs: number; ts: number };
 
 let currentUri: string | null = null;
@@ -37,9 +39,11 @@ export async function startAudioStream(uri: string): Promise<boolean> {
     console.warn("[AudioStream] native module not available");
     return false;
   }
+  console.log(TAG, "start request uri=", uri);
   try {
     const ok = await native.start(stripFileScheme(uri));
     if (ok) currentUri = uri;
+    console.log(TAG, "start result=", ok);
     return ok;
   } catch (e) {
     console.warn("[AudioStream] start failed:", e);
@@ -53,10 +57,12 @@ export async function startAudioStream(uri: string): Promise<boolean> {
  */
 export async function stopAudioStream(): Promise<string | null> {
   if (!native) return null;
+  console.log(TAG, "stop request uri=", currentUri);
   try {
     await native.stop();
     const uri = currentUri;
     currentUri = null;
+    console.log(TAG, "stop result uri=", uri);
     return uri;
   } catch (e) {
     console.warn("[AudioStream] stop failed:", e);

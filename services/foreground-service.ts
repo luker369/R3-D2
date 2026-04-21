@@ -49,8 +49,14 @@ export function isForegroundServiceRunning(): boolean {
  */
 export async function startForegroundService(): Promise<boolean> {
   if (Platform.OS !== "android") return false;
-  if (running) return true;
-  if (starting) return starting;
+  if (running) {
+    console.log(TAG, "start short-circuit: already running");
+    return true;
+  }
+  if (starting) {
+    console.log(TAG, "start short-circuit: another start in flight, awaiting it");
+    return starting;
+  }
 
   starting = (async () => {
     const appState = AppState.currentState;
@@ -129,7 +135,12 @@ export async function startForegroundService(): Promise<boolean> {
 }
 
 export async function stopForegroundService(): Promise<void> {
-  if (Platform.OS !== "android" || !running) return;
+  if (Platform.OS !== "android" || !running) {
+    if (Platform.OS === "android") {
+      console.log(TAG, "stop short-circuit: not running");
+    }
+    return;
+  }
 
   const mod = await loadNotifee();
   if (!mod) {

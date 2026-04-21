@@ -16,6 +16,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
+    console.log("[ROOT] RootLayout mounted");
     if (R2_CHIRP_ON_EVERY_HOME_FOCUS) return;
     return playR2Chirp();
   }, []);

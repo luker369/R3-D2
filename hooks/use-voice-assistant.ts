@@ -369,23 +369,30 @@ export function useVoiceAssistant() {
   }
 
   async function speakAndFinish(reply: string, voice?: TtsVoice) {
-    if (mounted.current) addTurn("assistant", reply);
-    if (mounted.current) setStatus("speaking");
-    const uri = await synthesizeSpeech(
-      reply,
-      "tts-response.mp3",
-      voice ?? currentVoice(),
-    );
-    await playSound(uri);
-    await releasePlaybackAudio();
-    const delay = Math.min(800, 300 + reply.split(/\s+/).length * 20);
-    await new Promise<void>((r) => setTimeout(r, delay));
-    if (isLooping.current) {
-      await resumeLoop();
-    } else {
-      if (mounted.current) setStatus("idle");
+    // try/finally guarantees isProcessing clears even if synth/play/release throws.
+    // Without this, a single TTS or playback failure leaks isProcessing=true
+    // and blocks every subsequent turn at the processRecording entry guard.
+    try {
+      if (mounted.current) addTurn("assistant", reply);
+      if (mounted.current) setStatus("speaking");
+      const uri = await synthesizeSpeech(
+        reply,
+        "tts-response.mp3",
+        voice ?? currentVoice(),
+      );
+      await playSound(uri);
+      await releasePlaybackAudio();
+      const delay = Math.min(800, 300 + reply.split(/\s+/).length * 20);
+      await new Promise<void>((r) => setTimeout(r, delay));
+      if (isLooping.current) {
+        await resumeLoop();
+      } else {
+        if (mounted.current) setStatus("idle");
+      }
+    } finally {
+      isProcessing.current = false;
+      console.log("[VA] speakAndFinish finally: isProcessing=false");
     }
-    isProcessing.current = false;
   }
 
   function isGmailReadCommand(text: string): boolean {
@@ -781,7 +788,7 @@ export function useVoiceAssistant() {
       );
       if (nameMatch) {
         await saveSystemSetting("assistant_name", nameMatch[1]);
-        return speakAndFinish(
+        return await speakAndFinish(
           `Acknowledged. I'll go by ${nameMatch[1]} from now on.`,
         );
       }
@@ -792,7 +799,7 @@ export function useVoiceAssistant() {
       if (addressMatch) {
         const title = addressMatch[1].trim().replace(/[.!]+$/, "");
         await saveSystemSetting("user_address", title);
-        return speakAndFinish(`Understood. I'll address you as ${title}.`);
+        return await speakAndFinish(`Understood. I'll address you as ${title}.`);
       }
 
       const userNameMatch = finalText.match(
@@ -800,7 +807,7 @@ export function useVoiceAssistant() {
       );
       if (userNameMatch) {
         await saveSystemSetting("user_name", userNameMatch[1]);
-        return speakAndFinish(
+        return await speakAndFinish(
           `Got it, ${userNameMatch[1]}. I'll remember that.`,
         );
       }
@@ -823,7 +830,7 @@ export function useVoiceAssistant() {
       if (mentionedVoice && voiceIntent.test(finalText)) {
         const idx = TTS_VOICES.indexOf(mentionedVoice);
         voiceIndex.current = idx;
-        return speakAndFinish(`Switched to ${mentionedVoice}.`, mentionedVoice);
+        return await speakAndFinish(`Switched to ${mentionedVoice}.`, mentionedVoice);
       }
 
       // ── Volume control ────────────────────────────────────────────────────
@@ -848,7 +855,7 @@ export function useVoiceAssistant() {
           volumeLevel.current = Math.max(0.1, volumeLevel.current - 0.2);
         }
         const pct = Math.round(volumeLevel.current * 10);
-        return speakAndFinish(`Volume set to ${pct}.`);
+        return await speakAndFinish(`Volume set to ${pct}.`);
       }
 
       // ── Personality tuning ────────────────────────────────────────────────
@@ -879,7 +886,7 @@ export function useVoiceAssistant() {
         const trait = PERSONALITIES[personalityMatch[1].toLowerCase()];
         if (trait) {
           await saveSystemSetting("personality", trait);
-          return speakAndFinish(`Adjusted. Switching to ${trait} mode.`);
+          return await speakAndFinish(`Adjusted. Switching to ${trait} mode.`);
         }
       }
 
@@ -902,7 +909,7 @@ export function useVoiceAssistant() {
           decision: "Decision locked in. We'll proceed accordingly.",
           summary: "Summary received. Stored and ready for deployment.",
         };
-        return speakAndFinish(replies[saveMatch[0]] ?? "Handled.");
+        return await speakAndFinish(replies[saveMatch[0]] ?? "Handled.");
       }
 
       // ── Gmail read (via Apps Script proxy) ──────────────────────────────
@@ -915,7 +922,7 @@ export function useVoiceAssistant() {
         if (stale()) { isProcessing.current = false; return; }
         if (emails.length === 0) {
           const where = scopedLabel ? ` in ${scopedLabel}` : "";
-          return speakAndFinish(
+          return await speakAndFinish(
             unread
               ? `Inbox is clear${where}. No unread messages.`
               : `No recent messages found${where}.`,
@@ -923,13 +930,13 @@ export function useVoiceAssistant() {
         }
         const summary = await summarizeEmailsForVoice(emails, unread);
         if (stale()) { isProcessing.current = false; return; }
-        return speakAndFinish(summary);
+        return await speakAndFinish(summary);
       }
 
       // ── Google OAuth: sign in / sign out ────────────────────────────────
       if (isGoogleSignInCommand(finalText)) {
         if (await isGoogleSignedIn()) {
-          return speakAndFinish("You're already connected to Google.");
+          return await speakAndFinish("You're already connected to Google.");
         }
         // Stop the listen loop while the browser is in focus; onConnected will speak confirmation.
         isLooping.current = false;
@@ -941,7 +948,7 @@ export function useVoiceAssistant() {
 
       if (isGoogleSignOutCommand(finalText)) {
         await clearGoogleTokens();
-        return speakAndFinish("Google account disconnected.");
+        return await speakAndFinish("Google account disconnected.");
       }
 
       // ── Calendar event creation ──────────────────────────────────────────
@@ -952,7 +959,7 @@ export function useVoiceAssistant() {
           return;
         }
         if (!parsed) {
-          return speakAndFinish(
+          return await speakAndFinish(
             `I need a clearer time for that. When should it go?`,
           );
         }
@@ -974,9 +981,9 @@ export function useVoiceAssistant() {
               : result.reason === "no_calendar"
                 ? `No writable calendar found on this device.`
                 : `Couldn't save that event. ${result.message}`;
-          return speakAndFinish(msg);
+          return await speakAndFinish(msg);
         }
-        return speakAndFinish(
+        return await speakAndFinish(
           formatEventConfirmation(
             parsed.title,
             new Date(parsed.startISO),
@@ -1082,6 +1089,18 @@ export function useVoiceAssistant() {
           streamDone = true;
           throw err;
         });
+
+      // Swallow a late rejection if the turn was already abandoned (stale).
+      // The await at end-of-drain still throws on the live path; this only
+      // silences "unhandled promise rejection" noise on aborted turns.
+      streamPromise.catch((err) => {
+        if (processingGen.current !== myGen) {
+          console.warn(
+            "[VA] streamPromise rejected post-stale, swallowed:",
+            err?.message,
+          );
+        }
+      });
 
       if (mounted.current) setStatus("speaking");
 
@@ -1258,13 +1277,31 @@ export function useVoiceAssistant() {
   // *something* is making forward progress.
   const WATCHDOG_MS = 20_000;
   useEffect(() => {
-    if (status !== "processing" && status !== "speaking") return;
+    // Also run in 'listening' so a leaked isProcessing (stuck-true while UI
+    // says listening) can still be detected and reset. Without this branch,
+    // a leak would silently block all subsequent turns until the user taps.
+    // The interval re-checks isProcessing on every tick, so a leak that
+    // appears *after* entering listening is still caught.
+    if (
+      status !== "processing" &&
+      status !== "speaking" &&
+      status !== "listening"
+    )
+      return;
     bumpProgress();
     const interval = setInterval(() => {
+      // In 'listening', only trip when a leak is actually present —
+      // otherwise normal idle listening would constantly trip the watchdog.
+      if (status === "listening" && !isProcessing.current) {
+        bumpProgress();
+        return;
+      }
       if (Date.now() - lastProgressAt.current >= WATCHDOG_MS) {
         console.warn(
           "[VA] watchdog tripped in status=",
           status,
+          "isProcessing=",
+          isProcessing.current,
           "— no progress for",
           WATCHDOG_MS,
           "ms",

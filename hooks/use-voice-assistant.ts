@@ -465,8 +465,14 @@ export function useVoiceAssistant() {
           console.log("[BG-AUDIO] currentSound cleared by=teardownPlayer settled=true");
           currentSound.current = null;
         }
-        try { void player.stopAsync(); } catch {}
-        try { void player.unloadAsync(); } catch {}
+        try {
+          const stopPromise = player.stopAsync() as Promise<unknown>;
+          stopPromise.catch(() => {});
+        } catch {}
+        try {
+          const unloadPromise = player.unloadAsync() as Promise<unknown>;
+          unloadPromise.catch(() => {});
+        } catch {}
       };
 
       const finishSuccess = (source: string) => {
@@ -2297,6 +2303,10 @@ export function useVoiceAssistant() {
       "isLooping=", isLooping.current,
       "isRecording=", isRecordingRef.current,
     );
+    if (s === "speaking" && isLooping.current && currentSound.current) {
+      console.log("[VA] ensureListening branch: active playback in progress — ignore assist re-entry");
+      return;
+    }
     if (s === "speaking" || s === "processing") {
       console.log("[VA] ensureListening branch: interrupt+resume");
       interrupt();
@@ -2352,3 +2362,4 @@ export function useVoiceAssistant() {
     sendText,
   };
 }
+

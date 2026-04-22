@@ -78,6 +78,17 @@ export async function startForegroundService(): Promise<boolean> {
     const { AndroidImportance, AndroidForegroundServiceType } = mod;
 
     try {
+      // Android 13+ requires runtime POST_NOTIFICATIONS permission. Without
+      // it, displayNotification silently no-ops and the FGS never promotes to
+      // foreground — which strips background audio/mic privileges, causing
+      // playback to wedge the moment the app is backgrounded.
+      const perm = await notifee.requestPermission();
+      console.log(
+        TAG,
+        "notification permission authorizationStatus=",
+        perm.authorizationStatus,
+      );
+
       if (!registerDone) {
         notifee.registerForegroundService(() => new Promise(() => {}));
         registerDone = true;
@@ -93,10 +104,15 @@ export async function startForegroundService(): Promise<boolean> {
       });
       console.log(TAG, "channel ready");
 
+      const NOTIF_BODY = "Listening...";
+      console.log(
+        TAG,
+        `displayNotification call: id=${NOTIFICATION_ID} title="R2-R3" body="${NOTIF_BODY}" — note: this body is set once and never updated by any code path`,
+      );
       await notifee.displayNotification({
         id: NOTIFICATION_ID,
         title: "R2-R3",
-        body: "Listening...",
+        body: NOTIF_BODY,
         android: {
           channelId: CHANNEL_ID,
           asForegroundService: true,
@@ -111,10 +127,25 @@ export async function startForegroundService(): Promise<boolean> {
         },
       });
 
-      const displayed = await notifee.getDisplayedNotifications();
-      const posted = displayed.some((n) => n.id === NOTIFICATION_ID);
+      // Poll instead of a single instant check — there's a brief internal lag
+      // between displayNotification returning and the notification appearing
+      // in getDisplayedNotifications, which a single check can race even when
+      // permission is fine.
+      let posted = false;
+      const verifyStartedAt = Date.now();
+      while (Date.now() - verifyStartedAt < 1000) {
+        const displayed = await notifee.getDisplayedNotifications();
+        if (displayed.some((n) => n.id === NOTIFICATION_ID)) {
+          posted = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 100));
+      }
       if (!posted) {
-        console.warn(TAG, "displayNotification returned but notification is not posted");
+        console.warn(
+          TAG,
+          "displayNotification returned but notification is not posted after 1s — likely missing POST_NOTIFICATIONS permission",
+        );
         return false;
       }
 
@@ -150,6 +181,7 @@ export async function stopForegroundService(): Promise<void> {
   const notifee = mod.default;
 
   try {
+    console.log(TAG, "stopForegroundService + cancelNotification call");
     await notifee.stopForegroundService();
     await notifee.cancelNotification(NOTIFICATION_ID);
     running = false;

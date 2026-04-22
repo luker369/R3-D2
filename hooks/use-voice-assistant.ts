@@ -102,6 +102,22 @@ const HALLUCINATION_SUBSTRINGS = [
   "conversational english",
 ];
 
+/**
+ * Drop only the sentences that contain a known hallucination substring,
+ * preserving any real question Whisper prepended/appended cruft to.
+ * Returns the cleaned text; caller decides whether the remainder is usable.
+ */
+function stripHallucinationSentences(text: string): string {
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  const kept: string[] = [];
+  for (const s of sentences) {
+    const norm = s.toLowerCase().trim();
+    if (HALLUCINATION_SUBSTRINGS.some((h) => norm.includes(h))) continue;
+    kept.push(s);
+  }
+  return kept.join(" ").trim();
+}
+
 function isHallucination(text: string): boolean {
   const normalized = text
     .toLowerCase()
@@ -168,6 +184,9 @@ export function useVoiceAssistant() {
   const streamAbort = useRef<AbortController | null>(null);
   const processingGen = useRef(0);
   const turnsSinceCompress = useRef(0);
+  // Monotonic turn counter for diagnostics — lets us spot whether audio wedge
+  // correlates with turn count or with elapsed time.
+  const turnNumber = useRef(0);
   const isLooping = useRef(false);
   const [looping, setLooping] = useState(false);
   const mounted = useRef(true);
@@ -192,6 +211,17 @@ export function useVoiceAssistant() {
   const statusRef = useRef<AssistantStatus>(status);
   useEffect(() => {
     statusRef.current = status;
+  }, [status]);
+
+  // State-transition trace. Logs every status change with the previous value
+  // and the current turn id so we can see whether state is moving in
+  // background or genuinely stuck. Purely additive — no behavior change.
+  const prevStatusForLog = useRef<AssistantStatus>(status);
+  useEffect(() => {
+    console.log(
+      `[VA STATE] turn=${turnNumber.current} ${prevStatusForLog.current} -> ${status} (looping=${isLooping.current}, isProcessing=${isProcessing.current})`,
+    );
+    prevStatusForLog.current = status;
   }, [status]);
 
   const resumeLoopRef = useRef<() => Promise<void>>(async () => {});
@@ -258,16 +288,32 @@ export function useVoiceAssistant() {
           shouldRouteThroughEarpiece: false,
           shouldPlayInBackground: true,
         });
-      } catch {}
+      } catch (e: any) {
+        console.warn("[VA] playSound setAudioModeAsync threw:", e?.message);
+      }
     }
     const player = createAudioPlayer({ uri });
     player.volume = volumeLevel.current;
+    // Snapshot the player's loaded state right after creation. If isLoaded=false
+    // or duration<=0 here it means the file failed to mount — players in that
+    // state never emit progress events and silently do nothing on .play().
+    try {
+      console.log(
+        "[VA] playSound created player isLoaded=",
+        (player as any).isLoaded,
+        "duration=",
+        (player as any).duration,
+        "volume=",
+        player.volume,
+      );
+    } catch {}
     currentSound.current = player;
     return new Promise((resolve) => {
       // Safety net against hung players — trips only if we stop getting progress
       // events, so any length of audio plays through so long as it's progressing.
       const STALL_MS = 8_000;
       let lastProgressAt = Date.now();
+      let updateCount = 0;
       const finish = () => {
         clearInterval(stallCheck);
         sub.remove();
@@ -279,15 +325,29 @@ export function useVoiceAssistant() {
       };
       const stallCheck = setInterval(() => {
         if (Date.now() - lastProgressAt > STALL_MS) {
-          console.warn("[VA] playSound stalled (no progress for 8s), forcing finish");
+          console.warn(
+            "[VA] playSound stalled (no progress for 8s), forcing finish updates=",
+            updateCount,
+          );
           finish();
         }
       }, 2000);
       const sub = player.addListener("playbackStatusUpdate", (status: any) => {
         lastProgressAt = Date.now();
+        updateCount++;
+        if (updateCount <= 3) {
+          // Dump the first few raw status objects so we can see whether the
+          // player is loading, erroring, or producing actual progress data.
+          console.log("[VA] playSound status#", updateCount, status);
+        }
         if (status.didJustFinish) finish();
       });
-      player.play();
+      try {
+        player.play();
+      } catch (e: any) {
+        console.warn("[VA] playSound player.play() threw:", e?.message);
+        finish();
+      }
     });
   }
 
@@ -710,8 +770,11 @@ export function useVoiceAssistant() {
   // ── Pipeline ───────────────────────────────────────────────────────────────
 
   const processRecording = useCallback(async () => {
+    const turnId = ++turnNumber.current;
     console.log(
-      "[VA] processRecording entry isProcessing=",
+      "[VA] processRecording entry turn=",
+      turnId,
+      "isProcessing=",
       isProcessing.current,
     );
     if (isProcessing.current) return;
@@ -731,13 +794,21 @@ export function useVoiceAssistant() {
       return;
     }
 
+    // shouldPlayInBackground MUST be set true here — this call runs while
+    // still foreground, before the user can background the app. If we leave
+    // it false, the backgrounded player honors that (foreground-baked) value
+    // and silently buffers forever. setAudioModeAsync called from background
+    // does not reliably take effect on Android.
     await setAudioModeAsync({
       allowsRecording: false,
       playsInSilentMode: true,
       interruptionMode: "mixWithOthers",
       shouldRouteThroughEarpiece: false,
-      shouldPlayInBackground: false,
+      shouldPlayInBackground: true,
     });
+    console.log(
+      "[VA] audio mode set: playback enabled, shouldPlayInBackground=true",
+    );
 
     setStatus("processing");
 
@@ -759,7 +830,25 @@ export function useVoiceAssistant() {
           "",
         )
         .trim();
-      const finalText = cleaned || userText;
+      const original = cleaned || userText;
+
+      // Whisper sometimes prepends YouTube-style cruft to a real question.
+      // Sentence-level strip recovers the real text when possible; if the
+      // remainder isn't usable, fall through to the original drop behavior.
+      const stripped = stripHallucinationSentences(original);
+      const recovered =
+        stripped.trim().split(/\s+/).length >= 2 && !isHallucination(stripped)
+          ? stripped
+          : null;
+      if (recovered && recovered !== original) {
+        console.log(
+          "[VA] recovered from hallucination strip:",
+          JSON.stringify(original),
+          "=>",
+          JSON.stringify(recovered),
+        );
+      }
+      const finalText = recovered ?? original;
 
       if (
         finalText.trim().split(/\s+/).length < 2 ||

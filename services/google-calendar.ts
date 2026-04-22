@@ -57,6 +57,61 @@ export function invalidateCalendarCache(): void {
   calendarCached = null;
 }
 
+export type CalEvent = {
+  id: string;
+  title: string;
+  startISO: string;
+  endISO: string;
+  allDay: boolean;
+  location?: string;
+};
+
+/**
+ * Midnight-to-midnight local-day window of events. Used by the daily briefing
+ * synthesis — separate code path from fetchCalendarContext so the briefing
+ * gets structured events rather than the pre-formatted 30-day string.
+ */
+export async function fetchTodayEvents(): Promise<CalEvent[]> {
+  const now = new Date();
+  return fetchEventsInWindow(startOfLocalDay(now), endOfLocalDay(now));
+}
+
+export async function fetchTomorrowEvents(): Promise<CalEvent[]> {
+  const t = new Date();
+  t.setDate(t.getDate() + 1);
+  return fetchEventsInWindow(startOfLocalDay(t), endOfLocalDay(t));
+}
+
+function startOfLocalDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function endOfLocalDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
+async function fetchEventsInWindow(start: Date, end: Date): Promise<CalEvent[]> {
+  if (!(await ensurePermission())) return [];
+  const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+  const ids = calendars.map(c => c.id);
+  if (ids.length === 0) return [];
+  const events = await Calendar.getEventsAsync(ids, start, end);
+  return events
+    .map(e => ({
+      id: e.id,
+      title: e.title ?? 'Untitled',
+      startISO: new Date(e.startDate).toISOString(),
+      endISO: new Date(e.endDate).toISOString(),
+      allDay: !!e.allDay,
+      location: e.location || undefined,
+    }))
+    .sort((a, b) => a.startISO.localeCompare(b.startISO));
+}
+
 export type CreateEventInput = {
   title: string;
   startDate: Date;
@@ -69,6 +124,23 @@ export type CreateEventInput = {
 export type CreateEventResult =
   | { ok: true; eventId: string; calendarTitle: string }
   | { ok: false; reason: 'permission' | 'no_calendar' | 'error'; message: string };
+
+export type CalendarWritable =
+  | { ok: true }
+  | { ok: false; reason: 'permission' | 'no_calendar' };
+
+/**
+ * Preflight check used by the two-turn confirmation flow so we don't summarize
+ * an event we can't actually save. Triggers the Android runtime prompt the
+ * same way createCalendarEvent does — just earlier in the turn.
+ */
+export async function ensureCalendarWritable(): Promise<CalendarWritable> {
+  if (!(await ensurePermission())) return { ok: false, reason: 'permission' };
+  const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+  const writable = calendars.filter(c => c.allowsModifications);
+  if (writable.length === 0) return { ok: false, reason: 'no_calendar' };
+  return { ok: true };
+}
 
 export async function createCalendarEvent(input: CreateEventInput): Promise<CreateEventResult> {
   if (!(await ensurePermission())) {

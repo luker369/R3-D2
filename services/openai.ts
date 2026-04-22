@@ -14,6 +14,7 @@
  */
 
 import * as FileSystem from 'expo-file-system/legacy';
+import { ENABLE_WEB_SEARCH } from '@/lib/feature-flags';
 
 // If EXPO_PUBLIC_OPENAI_BASE_URL is set (e.g. https://r2-proxy.workers.dev/v1), requests go through
 // your proxy which holds the real OpenAI key. In that case, EXPO_PUBLIC_OPENAI_API_KEY can be a
@@ -21,6 +22,15 @@ import * as FileSystem from 'expo-file-system/legacy';
 // If no proxy is configured we fall back to direct API calls (exposes the key in the APK).
 const API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 const BASE = (process.env.EXPO_PUBLIC_OPENAI_BASE_URL ?? 'https://api.openai.com/v1').replace(/\/$/, '');
+
+// Loud at module load so a missing .env fails obviously instead of deep inside
+// a request with a generic 401. A missing key means every call will fail.
+if (!API_KEY) {
+  console.error(
+    '[openai] EXPO_PUBLIC_OPENAI_API_KEY is missing — all OpenAI calls will return 401. ' +
+    'Set it in .env and rebuild (EXPO_PUBLIC_* vars are inlined at Metro bundle time).',
+  );
+}
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
@@ -32,6 +42,18 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   }
 }
 
+// Retryable = transient: network errors (no status), 429 (rate-limit), or 5xx.
+// 4xx non-429 are the model/key/request being wrong — retry only wastes time
+// and (for 429) gets double-charged on some plans.
+function isRetryable(err: any): boolean {
+  if (err?.name === 'AbortError') return false;
+  const status: number | undefined = err?.status;
+  if (status == null) return true; // network/fetch error with no HTTP status
+  if (status === 429) return true;
+  if (status >= 500) return true;
+  return false;
+}
+
 async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
   let lastErr: any;
   for (let i = 0; i < attempts; i++) {
@@ -40,6 +62,10 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
     } catch (err: any) {
       if (err?.name === 'AbortError') throw err;
       lastErr = err;
+      if (!isRetryable(err)) {
+        console.warn('[openai] non-retryable error, surfacing:', err?.message);
+        throw err;
+      }
       if (i < attempts - 1) {
         // Exponential backoff with jitter: 150–450ms, then 300–900ms, ...
         const base = 150 * Math.pow(2, i);
@@ -51,9 +77,14 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
   throw lastErr;
 }
 
-/** Trim API error bodies down to just the status so we don't leak request detail to UI. */
+/**
+ * Trim API error bodies down to just the status so we don't leak request detail
+ * to UI. Attaches `.status` so withRetry can decide whether to retry.
+ */
 function safeErr(label: string, status: number): Error {
-  return new Error(`${label} ${status}`);
+  const err = new Error(`${label} ${status}`);
+  (err as any).status = status;
+  return err;
 }
 
 
@@ -255,10 +286,13 @@ export function streamChatResponse(
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const systemContent = buildSystemContent(memoryContext, systemSettings);
-    const { allow: useSearch, query: gateQuery } = shouldUseWebSearch(history);
+    const { allow: intentAllow, query: gateQuery } = shouldUseWebSearch(history);
+    // Feature flag ENABLE_WEB_SEARCH is a hard kill switch; it cannot enable
+    // search past the intent gate, only forbid it. Both must agree.
+    const useSearch = intentAllow && ENABLE_WEB_SEARCH;
     console.log(
       '[openai] web_search gate:',
-      useSearch ? 'ALLOW' : 'block',
+      useSearch ? 'ALLOW' : (ENABLE_WEB_SEARCH ? 'block' : 'block(flag-off)'),
       '—',
       gateQuery.slice(0, 80),
     );
@@ -309,6 +343,18 @@ export function streamChatResponse(
         try {
           const chunk = JSON.parse(payload);
           lastTokenAt = Date.now();
+          // Cost telemetry — Responses API emits usage on the terminal event.
+          // Log it once per turn so a session total can be reconstructed from
+          // log tail. Cheap and unobtrusive; drop into an aggregator later.
+          if (chunk.type === 'response.completed' && chunk.response?.usage) {
+            const u = chunk.response.usage;
+            console.log(
+              '[openai] usage in=', u.input_tokens,
+              'out=', u.output_tokens,
+              'total=', u.total_tokens,
+              'model=', chunk.response.model ?? 'unknown',
+            );
+          }
           if (chunk.type !== 'response.output_text.delta') continue;
           const token: string = chunk.delta ?? '';
           if (!token) continue;

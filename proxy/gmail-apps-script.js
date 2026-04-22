@@ -9,8 +9,16 @@
  *      - Description: R2-D3 Gmail proxy
  *      - Execute as: Me (your Google account)
  *      - Who has access: Anyone (auth happens via SHARED_SECRET, not Google)
- *   5. Authorize when prompted (first run only — grants Gmail read permission to the script)
+ *   5. Authorize when prompted (first run only — grants Gmail permissions to the script)
  *   6. Copy the Web app URL → paste into the app's .env as EXPO_PUBLIC_APPS_SCRIPT_URL
+ *
+ * RE-DEPLOY when send/reply are added:
+ *   Apps Script tracks scopes per deployed version. Because send and reply call
+ *   GmailApp.sendEmail / thread.reply, a new Gmail *send* scope is required.
+ *   After pasting the new code:
+ *     Deploy → Manage deployments → pencil icon on existing deployment
+ *       → Version: "New version" → Deploy → re-authorize when prompted.
+ *   The Web app URL stays the same; no .env change needed.
  *
  * Why "Anyone"? Apps Script's "Anyone with Google account" still exposes the URL, but the
  * SHARED_SECRET check below rejects unauthenticated callers. Keep the secret out of version control.
@@ -32,6 +40,8 @@ function handle(e) {
     if (action === 'recent')  return json(getRecent(count));
     if (action === 'unread')  return json(getUnread(count));
     if (action === 'search')  return json(searchGmail(params.q || '', count));
+    if (action === 'send')    return json(sendNewEmail(params));
+    if (action === 'reply')   return json(replyToThread(params));
     return json({ error: 'unknown action: ' + action });
   } catch (err) {
     return json({ error: String(err) });
@@ -41,6 +51,27 @@ function handle(e) {
 function getRecent(count)           { return GmailApp.getInboxThreads(0, count).map(summarize); }
 function getUnread(count)           { return GmailApp.search('is:unread in:inbox', 0, count).map(summarize); }
 function searchGmail(query, count)  { return GmailApp.search(query, 0, count).map(summarize); }
+
+function sendNewEmail(p) {
+  const to = (p.to || '').trim();
+  const subject = (p.subject || '(no subject)').trim();
+  const body = p.body || '';
+  if (!to) return { error: 'missing to' };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return { error: 'invalid to' };
+  GmailApp.sendEmail(to, subject, body);
+  return { ok: true };
+}
+
+function replyToThread(p) {
+  const threadId = (p.threadId || '').trim();
+  const body = p.body || '';
+  if (!threadId) return { error: 'missing threadId' };
+  if (!body.trim()) return { error: 'empty body' };
+  const thread = GmailApp.getThreadById(threadId);
+  if (!thread) return { error: 'thread not found' };
+  thread.reply(body);
+  return { ok: true };
+}
 
 function summarize(thread) {
   const msgs = thread.getMessages();

@@ -56,7 +56,7 @@ export default function HomeScreen() {
       <AnimatedBackground />
       <View style={styles.robotAnchor}>
         <LottieView
-          source={require('../../assets/images/robot.json')}
+          source={require('../assets/images/robot.json')}
           autoPlay
           loop
           style={styles.robot}

@@ -13,16 +13,28 @@ import {
     clearTokens as clearGoogleTokens,
     isSignedIn as isGoogleSignedIn,
 } from "@/services/google-auth";
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from "expo-av";
 import {
     createCalendarEvent,
+    ensureCalendarWritable,
     fetchCalendarContext,
 } from "@/services/google-calendar";
+import { detectConfirmation } from "@/lib/confirmation";
 import {
     fetchRecentEmails,
     fetchUnreadEmails,
     getAccountLabels,
+    replyToThread,
+    sendEmail,
     type GmailMessage,
 } from "@/services/gmail";
+import {
+    deriveSubject,
+    detectEmailCommand,
+    normalizeSpokenAddress,
+} from "@/lib/email-commands";
+import { detectSynthesisCommand } from "@/lib/synthesis-commands";
+import { runDailySynthesis } from "@/services/daily-synthesis";
 import {
     extractAndSaveMemory,
     fetchMemories,
@@ -39,102 +51,24 @@ import {
     type Message,
     type TtsVoice,
 } from "@/services/openai";
-import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, DeviceEventEmitter, Linking, type AppStateStatus } from "react-native";
 import { onAudioFrame } from "@/services/audio-stream";
+import { isHallucination, stripHallucinationSentences } from "@/lib/hallucinations";
+import { detectTaskCommand } from "@/lib/task-commands";
+import { detectReminderCommand } from "@/lib/reminder-commands";
+import { formatReminderTime, parseReminderTime } from "@/lib/reminder-time";
+import {
+  completeTaskByTitle,
+  createTask,
+  listOpenTasks,
+} from "@/services/tasks";
+import {
+  createReminder,
+  listTodayReminders,
+} from "@/services/reminders";
 import { useGoogleSignIn } from "./use-google-auth";
 import { useVoiceRecorder } from "./use-voice-recorder";
-
-// ─── Whisper hallucination blocklist ─────────────────────────────────────────
-
-const HALLUCINATIONS = new Set([
-  "thanks for watching",
-  "thank you for watching",
-  "thanks a lot for watching",
-  "thank you so much for watching",
-  "please subscribe",
-  "like and subscribe",
-  "subscribe",
-  "thank you",
-  "thanks",
-  "you",
-  "the",
-  "okay",
-  "ok",
-  "yeah",
-  "yes",
-  "no",
-  "hmm",
-  "um",
-  "uh",
-  "bye",
-  "goodbye",
-  "see you",
-  "see you later",
-  "have a good day",
-  "have a great day",
-  "take care",
-]);
-
-const HALLUCINATION_SUBSTRINGS = [
-  "if you have any questions or comments, please post them in the comments",
-  "if you have any questions or other problems, please post them in the comments",
-  "casual message to an ai voice assistant",
-  "casual spoken message to an ai voice assistant",
-  "this is a test",
-  "testing testing",
-  "brought to you by",
-  "don't forget to subscribe",
-  "smash the like button",
-  "in this video",
-  "in today's video",
-  "welcome back to",
-  "for watching this video",
-  "r3-d2, a personal voice assistant",
-  "this video was made possible",
-  "help and contributions from the youtube community",
-  "what is you favorite english word",
-  "what is your favorite english word",
-  "let us know in the comments",
-  "derivative work of the touhou project",
-  "resemblance to anyone, living or dead, is coincidental",
-  "conversational english",
-];
-
-/**
- * Drop only the sentences that contain a known hallucination substring,
- * preserving any real question Whisper prepended/appended cruft to.
- * Returns the cleaned text; caller decides whether the remainder is usable.
- */
-function stripHallucinationSentences(text: string): string {
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  const kept: string[] = [];
-  for (const s of sentences) {
-    const norm = s.toLowerCase().trim();
-    if (HALLUCINATION_SUBSTRINGS.some((h) => norm.includes(h))) continue;
-    kept.push(s);
-  }
-  return kept.join(" ").trim();
-}
-
-function isHallucination(text: string): boolean {
-  const normalized = text
-    .toLowerCase()
-    .trim()
-    .replace(/[.!?,]+$/, "");
-  if (HALLUCINATIONS.has(normalized)) return true;
-  if (HALLUCINATION_SUBSTRINGS.some((s) => normalized.includes(s))) return true;
-
-  // Reject if >40% of words are repeated — Whisper looping artifact
-  const words = normalized.split(/\s+/);
-  if (words.length >= 6) {
-    const unique = new Set(words).size;
-    if (unique / words.length < 0.5) return true;
-  }
-
-  return false;
-}
 
 // ─── Silence detection config ─────────────────────────────────────────────────
 
@@ -184,6 +118,58 @@ export function useVoiceAssistant() {
   const streamAbort = useRef<AbortController | null>(null);
   const processingGen = useRef(0);
   const turnsSinceCompress = useRef(0);
+
+  // Two-turn calendar confirmation: on a calendar utterance we parse, stash
+  // the proposed event here, and speak a summary + "Should I create it?". The
+  // next turn's yes/no is matched against this; anything else clears it and
+  // falls through to normal processing. TTL prevents a stale pending from
+  // eating a much-later "yes" meant for something else.
+  const pendingCalendarEvent = useRef<{
+    title: string;
+    startDate: Date;
+    endDate: Date;
+    allDay?: boolean;
+    location?: string;
+    expiresAt: number;
+  } | null>(null);
+  const PENDING_CAL_TTL_MS = 60_000;
+
+  // Populated after an inbox-read turn — lets "reply to that email" know which
+  // thread to hit. 5-min TTL so a stale reference doesn't silently attach to a
+  // reply the user meant for a different context.
+  const lastDiscussedEmail = useRef<{
+    threadId: string;
+    from: string;
+    subject: string;
+    account: string | undefined;
+    expiresAt: number;
+  } | null>(null);
+  const LAST_EMAIL_TTL_MS = 5 * 60_000;
+
+  // Two-turn email confirmation, mirror of pendingCalendarEvent. The draft is
+  // built on the first turn, spoken back, and held here until the user says
+  // yes/no. TTL shorter than calendar because a pending send is riskier than
+  // a pending event create.
+  const pendingEmail = useRef<
+    | {
+        kind: 'draft';
+        to: string;
+        subject: string;
+        body: string;
+        account: string | undefined;
+        expiresAt: number;
+      }
+    | {
+        kind: 'reply';
+        threadId: string;
+        replyingTo: string;
+        body: string;
+        account: string | undefined;
+        expiresAt: number;
+      }
+    | null
+  >(null);
+  const PENDING_EMAIL_TTL_MS = 60_000;
   // Monotonic turn counter for diagnostics — lets us spot whether audio wedge
   // correlates with turn count or with elapsed time.
   const turnNumber = useRef(0);
@@ -209,6 +195,7 @@ export function useVoiceAssistant() {
       // background mic-permitted notification.
       streamAbort.current?.abort();
       if (currentSound.current) {
+        console.log("[BG-AUDIO] currentSound cleared by=unmount-cleanup");
         try { currentSound.current.remove(); } catch {}
         currentSound.current = null;
       }
@@ -232,6 +219,10 @@ export function useVoiceAssistant() {
     (next: AssistantStatus, reason?: string) => {
       const prev = statusRef.current;
       if (prev === next) return;
+      // Keep the ref in lockstep with the setter. The useEffect above also
+      // syncs on render, but synchronous callers (e.g. finishTurnToListening's
+      // post-resume log) would otherwise read a stale value for one tick.
+      statusRef.current = next;
       console.log(
         `[VA STATE] turn=${turnNumber.current} ${prev} -> ${next}` +
           (reason ? ` (${reason})` : "") +
@@ -311,6 +302,9 @@ export function useVoiceAssistant() {
                 `gate:${reason}${started ? "" : ":race-winner"}`,
               );
             }
+            console.log(
+              `[VA GATE ${reason}] listening-restarted epoch=${myEpoch}`,
+            );
             return true;
           }
 
@@ -394,7 +388,37 @@ export function useVoiceAssistant() {
 
   const currentSound = useRef<any>(null);
 
-  async function playSound(uri: string): Promise<void> {
+  async function setPlaybackSessionActive(active: boolean) {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: active,
+      staysActiveInBackground: active,
+      interruptionModeIOS: active
+        ? InterruptionModeIOS.DoNotMix
+        : InterruptionModeIOS.MixWithOthers,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      shouldDuckAndroid: false,
+      playThroughEarpieceAndroid: false,
+    });
+  }
+
+  /**
+   * Play a TTS audio file. Two watchdogs guard long-session degradation:
+   *
+   *   FIRST_PROGRESS_MS (2s)  — if .play() was called but no progress event
+   *     ever arrived, treat as a silent-failure (Android has been observed
+   *     to accept .play() and return without producing audio after many turns).
+   *     Trigger hardAudioReset + retry once. If the retry also fails, reject
+   *     so speakAndFinish can surface an error — never silently continue.
+   *
+   *   STALL_MS (8s)           — ONLY armed after first progress arrived. Guards
+   *     against players that start, then freeze mid-playback. A freeze here is
+   *     treated as successful completion (we've already emitted audible audio).
+   *
+   * Every lifecycle transition logs: start, first-progress, end, failure.
+   */
+  async function playSound(uri: string, retry: number = 0): Promise<void> {
+    await hardAudioReset("pre-play");
     if (isLooping.current) {
       try {
         // shouldPlayInBackground=true paired with MEDIA_PLAYBACK in the FGS
@@ -402,123 +426,230 @@ export function useVoiceAssistant() {
         // FGS type, Android 14+ silently rejected the audio session and the
         // player stalled (ready -> idle, currentTime never advanced) the
         // moment the app was hidden.
-        await setAudioModeAsync({
-          allowsRecording: false,
-          playsInSilentMode: true,
-          interruptionMode: "mixWithOthers",
-          shouldRouteThroughEarpiece: false,
-          shouldPlayInBackground: true,
-        });
+        await setPlaybackSessionActive(true);
       } catch (e: any) {
-        console.warn("[VA] playSound setAudioModeAsync threw:", e?.message);
+        console.warn("[VA] playSound setPlaybackSessionActive threw:", e?.message);
       }
     }
-    const player = createAudioPlayer({ uri });
-    player.volume = volumeLevel.current;
-    // Snapshot the player's loaded state right after creation. If isLoaded=false
-    // or duration<=0 here it means the file failed to mount — players in that
-    // state never emit progress events and silently do nothing on .play().
-    try {
-      console.log(
-        "[VA] playSound created player isLoaded=",
-        (player as any).isLoaded,
-        "duration=",
-        (player as any).duration,
-        "volume=",
-        player.volume,
-      );
-    } catch {}
+    const player = new Audio.Sound();
+    const psAppState = AppState.currentState;
     currentSound.current = player;
-    return new Promise((resolve) => {
-      // Safety net against hung players — trips only if we stop getting progress
-      // events, so any length of audio plays through so long as it's progressing.
+    console.log(`[BG-AUDIO] currentSound set by=playSound retry=${retry}`);
+    return new Promise((resolve, reject) => {
+      // Background ExoPlayer callback delivery is deprioritized — first
+      // playbackStatusUpdate can legitimately take 3-5s to arrive even when
+      // audio is playing fine. 2s foreground is plenty; 6s background avoids
+      // false NO_AUDIO retries on a healthy stream.
+      const FIRST_PROGRESS_MS = psAppState === "active" ? 2_000 : 6_000;
       const STALL_MS = 8_000;
+      let firstProgressAt: number | null = null;
       let lastProgressAt = Date.now();
       let updateCount = 0;
       let lastPlaybackState: string | undefined;
       let lastStatus: any = null;
       let maxCurrentTime = 0;
-      // Idempotency guard. finish() may be reached from three concurrent
-      // paths: stallCheck timer, didJustFinish status event, or a parallel
-      // interrupt() call removing currentSound. Without this guard, a race
-      // can double-resolve the promise and double-remove the native player.
-      let finished = false;
-      const finish = () => {
-        if (finished) return;
-        finished = true;
+      // Idempotency guard. finish/failNoAudio can each be reached from multiple
+      // concurrent paths (watchdog timers, didJustFinish event, parallel
+      // interrupt). This prevents double-resolve and double-remove of the
+      // native player.
+      let settled = false;
+
+      const cleanupTimers = () => {
+        clearTimeout(firstProgressWatchdog);
         clearInterval(stallCheck);
-        sub.remove();
-        if (currentSound.current === player) currentSound.current = null;
-        // Pause before remove so Android releases audio focus cleanly.
-        // remove() mid-play can leave focus held, which silently blocks
-        // the next turn's player.play() from producing sound.
-        try { player.pause(); } catch {}
-        try { player.remove(); } catch {}
+        player.setOnPlaybackStatusUpdate(null);
+      };
+
+      const teardownPlayer = () => {
+        if (currentSound.current === player) {
+          console.log("[BG-AUDIO] currentSound cleared by=teardownPlayer settled=true");
+          currentSound.current = null;
+        }
+        try { void player.stopAsync(); } catch {}
+        try { void player.unloadAsync(); } catch {}
+      };
+
+      const finishSuccess = (source: string) => {
+        if (settled) return;
+        settled = true;
+        cleanupTimers();
+        teardownPlayer();
+        console.log(
+          "[BG-AUDIO] playSound end source=",
+          source,
+          "appState=",
+          AppState.currentState,
+          "updates=",
+          updateCount,
+          "maxCurrentTime=",
+          maxCurrentTime,
+        );
         resolve();
       };
+
+      const failNoAudio = async (reason: string) => {
+        if (settled) return;
+        settled = true;
+        cleanupTimers();
+        teardownPlayer();
+        console.warn(
+          "[BG-AUDIO] playSound NO_AUDIO reason=",
+          reason,
+          "appState=",
+          AppState.currentState,
+          "retry=",
+          retry,
+          "updates=",
+          updateCount,
+          "firstProgressMs=",
+          FIRST_PROGRESS_MS,
+          "lastStatus=",
+          lastStatus,
+        );
+        await hardAudioReset("no-audio-fail");
+        if (retry < 1) {
+          console.warn("[VA] playSound retry 1/1");
+          try {
+            await playSound(uri, retry + 1);
+            resolve();
+          } catch (e) {
+            reject(e);
+          }
+        } else {
+          reject(new Error(`no_audio_after_retry:${reason}`));
+        }
+      };
+
+      const firstProgressWatchdog = setTimeout(() => {
+        if (firstProgressAt === null && !settled) {
+          void failNoAudio("no-first-progress-2s");
+        }
+      }, FIRST_PROGRESS_MS);
+
       const stallCheck = setInterval(() => {
-        if (Date.now() - lastProgressAt > STALL_MS) {
+        // Only arm the stall check after REAL first progress (currentTime > 0).
+        // Before that, the first-progress watchdog is authoritative. A stall
+        // here means the player froze mid-playback — audible audio was
+        // already emitted — so treat it as a graceful finish.
+        if (firstProgressAt !== null && Date.now() - lastProgressAt > STALL_MS) {
+          if (maxCurrentTime <= 0) {
+            // Defensive: should be unreachable since firstProgressAt now
+            // only sets when currentTime>0. If it ever fires, treat as
+            // NO_AUDIO, not success.
+            console.warn(
+              "[BG-AUDIO] playSound stall but maxCurrentTime=0 — treating as NO_AUDIO",
+            );
+            void failNoAudio("stall-zero-currentTime");
+            return;
+          }
           console.warn(
-            "[VA] playSound stalled (no progress for 8s), forcing finish updates=",
+            "[BG-AUDIO] playSound stalled (no progress for 8s post-start), finishing updates=",
             updateCount,
             "maxCurrentTime=",
             maxCurrentTime,
-            "lastStatus=",
-            lastStatus,
           );
-          finish();
+          finishSuccess("stall-after-progress");
         }
       }, 2000);
-      const sub = player.addListener("playbackStatusUpdate", (status: any) => {
-        lastProgressAt = Date.now();
+
+      player.setOnPlaybackStatusUpdate((status: any) => {
         updateCount++;
         lastStatus = status;
-        if (typeof status?.currentTime === "number" && status.currentTime > maxCurrentTime) {
-          maxCurrentTime = status.currentTime;
+        const currentTime =
+          typeof status?.positionMillis === "number" ? status.positionMillis / 1000 : 0;
+        const duration =
+          typeof status?.durationMillis === "number" ? status.durationMillis / 1000 : 0;
+        if (currentTime > maxCurrentTime) {
+          maxCurrentTime = currentTime;
         }
-        // Log every playbackState transition so we can see whether the player
-        // ever leaves "buffering"/"paused" even if status frequency is low.
-        if (status?.playbackState !== lastPlaybackState) {
+        if (updateCount <= 20) {
+          console.log(
+            `[BG-AUDIO] playSound evt# ${updateCount} isLoaded=${status?.isLoaded} isPlaying=${status?.isPlaying} isBuffering=${status?.isBuffering} ct=${currentTime} dur=${duration} didJustFinish=${status?.didJustFinish} error=${status?.error ?? "null"}`,
+          );
+        }
+        if (firstProgressAt === null && maxCurrentTime > 0) {
+          firstProgressAt = Date.now();
+          lastProgressAt = Date.now();
+          console.log(
+            "[BG-AUDIO] playSound first-real-progress appState=",
+            AppState.currentState,
+            "updates=",
+            updateCount,
+            "isLoaded=",
+            status?.isLoaded,
+            "currentTime=",
+            currentTime,
+          );
+        } else if (firstProgressAt !== null) {
+          lastProgressAt = Date.now();
+        }
+        const playbackState = `${status?.isLoaded}:${status?.isPlaying}:${status?.isBuffering}`;
+        if (playbackState !== lastPlaybackState) {
           console.log(
             "[VA] playSound state change #",
             updateCount,
             lastPlaybackState,
             "->",
-            status?.playbackState,
+            playbackState,
             "playing=",
-            status?.playing,
-            "tcs=",
-            status?.timeControlStatus,
+            status?.isPlaying,
             "isLoaded=",
             status?.isLoaded,
             "currentTime=",
-            status?.currentTime,
+            currentTime,
             "duration=",
-            status?.duration,
+            duration,
           );
-          lastPlaybackState = status?.playbackState;
+          lastPlaybackState = playbackState;
         }
-        if (status.didJustFinish) finish();
+        if (status?.error) {
+          void failNoAudio(`status-error:${status.error}`);
+          return;
+        }
+        if (status.didJustFinish) finishSuccess("didJustFinish");
       });
-      try {
-        player.play();
-        // Snapshot the player immediately after .play() — if this shows
-        // playing=false / tcs=paused, the call was rejected by the audio
-        // subsystem (not just waiting to buffer).
+
+      void (async () => {
         try {
+          const loadStatus = await player.loadAsync(
+            { uri },
+            {
+              shouldPlay: false,
+              volume: volumeLevel.current,
+              progressUpdateIntervalMillis: 250,
+            },
+            false,
+          );
+          console.log(
+            "[BG-AUDIO] playSound player-created retry=",
+            retry,
+            "appState=",
+            psAppState,
+            "isLoaded=",
+            loadStatus.isLoaded,
+            "duration=",
+            loadStatus.isLoaded ? loadStatus.durationMillis / 1000 : 0,
+            "volume=",
+            volumeLevel.current,
+          );
+          console.log(
+            "[BG-AUDIO] playSound play() called appState=",
+            AppState.currentState,
+            "isLoaded=",
+            loadStatus.isLoaded,
+          );
+          const playStatus = await player.playAsync();
           console.log(
             "[VA] playSound post-play snapshot playing=",
-            (player as any).playing,
-            "tcs=",
-            (player as any).timeControlStatus,
+            playStatus.isLoaded ? playStatus.isPlaying : false,
             "isLoaded=",
-            (player as any).isLoaded,
+            playStatus.isLoaded,
           );
-        } catch {}
-      } catch (e: any) {
-        console.warn("[VA] playSound player.play() threw:", e?.message);
-        finish();
-      }
+        } catch (e: any) {
+          console.warn("[VA] playSound player.play() threw:", e?.message);
+          void failNoAudio(`play-threw:${e?.message ?? "unknown"}`);
+        }
+      })();
     });
   }
 
@@ -532,10 +663,29 @@ export function useVoiceAssistant() {
     if (!isLooping.current || !mounted.current) return;
     let ok = await ensureListeningLockedRef.current("resumeLoop");
     if (!ok && mounted.current) {
-      await new Promise<void>((r) => setTimeout(r, 500));
+      await new Promise<void>((r) => setTimeout(r, 250));
       ok = await ensureListeningLockedRef.current("resumeLoop:retry");
     }
     if (!ok && mounted.current) setStatusSafe("idle", "resumeLoop:fail");
+  }
+
+  // Single exit point for every turn-completion path. Guarantees that if the
+  // loop is still intended (`isLooping.current`), we always attempt to return
+  // to listening — no silent dead-ends. The post-resume log tells us whether
+  // the mic actually came back up, which is what the user notices.
+  async function finishTurnToListening(reason: string): Promise<void> {
+    console.log(
+      `[VA] finishTurnToListening reason=${reason} isLooping=${isLooping.current} mounted=${mounted.current}`,
+    );
+    if (!mounted.current) return;
+    if (isLooping.current) {
+      await resumeLoop();
+      console.log(
+        `[VA] finishTurnToListening post-resume reason=${reason} status=${statusRef.current} recording=${isRecordingRef.current}`,
+      );
+    } else {
+      setStatusSafe("idle", `finishTurn:${reason}`);
+    }
   }
 
   resumeLoopRef.current = resumeLoop;
@@ -569,32 +719,54 @@ export function useVoiceAssistant() {
     return () => sub.remove();
   }, []);
 
+  /**
+   * Fully tear down the audio path and release focus. Call:
+   *   - before every new playback (so the next player starts clean)
+   *   - after any playback failure
+   *   - from interrupt()
+   *
+   * The player pause/remove is effectively synchronous; the audio-mode drop
+   * is the only async part. Safe to call with no current player (no-op on
+   * the player side; still releases focus).
+   */
+  async function hardAudioReset(reason: string): Promise<void> {
+    const had = !!currentSound.current;
+    console.log(
+      `[BG-AUDIO] hardAudioReset reason=${reason} hadPlayer=${had} appState=${AppState.currentState}`,
+    );
+    if (currentSound.current) {
+      console.log(`[BG-AUDIO] currentSound cleared by=hardAudioReset:${reason}`);
+      try { await currentSound.current.stopAsync?.(); }
+      catch (e: any) { console.warn("[VA] hardAudioReset stopAsync threw:", e?.message); }
+      try { await currentSound.current.unloadAsync?.(); }
+      catch (e: any) { console.warn("[VA] hardAudioReset unloadAsync threw:", e?.message); }
+      currentSound.current = null;
+    }
+    // Drop the playback session even without a current player. Android can keep
+    // a stale audio state across turns, and the next player then transitions
+    // ready -> idle with currentTime still 0.
+    try {
+      await setPlaybackSessionActive(false);
+    } catch (e: any) {
+      console.warn("[VA] hardAudioReset setPlaybackSessionActive threw:", e?.message);
+    }
+  }
+
   function interrupt() {
     processingGen.current += 1;
     isProcessing.current = false;
     streamAbort.current?.abort();
-    if (currentSound.current) {
-      try {
-        currentSound.current.pause();
-      } catch {}
-      try {
-        currentSound.current.remove();
-      } catch {}
-      currentSound.current = null;
-    }
+    // Fire-and-forget: next playSound will hardAudioReset again, but doing it
+    // here too makes the transition between turns explicit. The sync player
+    // cleanup inside hardAudioReset happens before the async mode-set awaits.
+    void hardAudioReset("interrupt");
     isProcessing.current = false;
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   async function releasePlaybackAudio() {
-    await setAudioModeAsync({
-      allowsRecording: false,
-      playsInSilentMode: false,
-      interruptionMode: "mixWithOthers",
-      shouldRouteThroughEarpiece: false,
-      shouldPlayInBackground: false,
-    });
+    await setPlaybackSessionActive(false);
   }
 
   async function speakAndFinish(reply: string, voice?: TtsVoice) {
@@ -609,7 +781,20 @@ export function useVoiceAssistant() {
         "tts-response.mp3",
         voice ?? currentVoice(),
       );
-      await playSound(uri);
+      // playSound has its own first-progress watchdog + one retry. If both
+      // attempts fail, surface an error state — NEVER silently continue the
+      // turn as though we spoke.
+      let playbackFailed = false;
+      try {
+        await playSound(uri);
+      } catch (e: any) {
+        console.warn("[VA] speakAndFinish playback failed after retry:", e?.message);
+        await hardAudioReset("speakAndFinish-fail");
+        if (mounted.current) setError("Audio playback failed. Tap to retry.");
+        playbackFailed = true;
+        // Fall through — still attempt to return to listening so a single
+        // failed recovery line doesn't leave the mic dead.
+      }
       try {
         await releasePlaybackAudio();
       } catch (e: any) {
@@ -617,11 +802,9 @@ export function useVoiceAssistant() {
       }
       const delay = Math.min(800, 300 + reply.split(/\s+/).length * 20);
       await new Promise<void>((r) => setTimeout(r, delay));
-      if (isLooping.current) {
-        await resumeLoop();
-      } else {
-        if (mounted.current) setStatusSafe("idle", "speakAndFinish:end");
-      }
+      await finishTurnToListening(
+        playbackFailed ? "speakAndFinish:playback-failed" : "speakAndFinish:end",
+      );
     } finally {
       isProcessing.current = false;
       console.log("[VA] speakAndFinish finally: isProcessing=false");
@@ -828,6 +1011,34 @@ export function useVoiceAssistant() {
     return `Scheduled: ${title}, ${day} at ${time}.`;
   }
 
+  // Spoken summary used at the "should I create it?" step — includes end time
+  // so the user knows what duration the parser picked (esp. for "two hours for
+  // R2 work tonight" where the LLM chose both start and end).
+  function formatEventProposal(
+    title: string,
+    start: Date,
+    end: Date,
+    allDay: boolean,
+    location?: string,
+  ): string {
+    const day = start.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+    const loc = location ? ` at ${location}` : "";
+    if (allDay) return `${title}, ${day}, all day${loc}`;
+    const startTime = start.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    const endTime = end.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    return `${title}, ${day}, ${startTime} to ${endTime}${loc}`;
+  }
+
   function parseSaveCommand(text: string): [string, string] | null {
     let m;
     // Notes
@@ -1013,26 +1224,33 @@ export function useVoiceAssistant() {
     // the turn to proceed (playback may degrade but text path still works);
     // previously a throw aborted the whole turn silently.
     try {
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-        interruptionMode: "mixWithOthers",
-        shouldRouteThroughEarpiece: false,
-        shouldPlayInBackground: true,
-      });
+      await setPlaybackSessionActive(true);
       console.log(
         "[VA] audio mode set: playback enabled, shouldPlayInBackground=true",
       );
     } catch (e: any) {
-      console.warn("[VA] processRecording setAudioModeAsync threw:", e?.message);
+      console.warn("[VA] processRecording setPlaybackSessionActive threw:", e?.message);
     }
 
     setStatusSafe("processing", "pipeline-start");
 
+    // Per-turn timing bucket. Populated at key events inside this try block
+    // and logged once at the end so bottlenecks are visible in one line.
+    const turnStartedAt = Date.now();
+    const timings: {
+      sttMs?: number;
+      ttfs?: number; // time to first sentence from turn start
+      ttfa?: number; // time to first audio from turn start
+    } = {};
+
     try {
+      const sttStart = Date.now();
       const [userText, memoryContext, systemSettings, calendarContext] =
         await Promise.all([
-          transcribeAudio(audioUri),
+          transcribeAudio(audioUri).then((r) => {
+            timings.sttMs = Date.now() - sttStart;
+            return r;
+          }),
           fetchMemories(),
           fetchSystemSettings(),
           fetchCalendarContext(),
@@ -1234,6 +1452,17 @@ export function useVoiceAssistant() {
               : `No recent messages found${where}.`,
           );
         }
+        // Stash the top email so "reply to that email" has a referent.
+        // 5-min TTL — long enough for a natural follow-up, short enough that
+        // a later reply won't silently attach to a stale thread.
+        const top = emails[0];
+        lastDiscussedEmail.current = {
+          threadId: top.id,
+          from: top.from,
+          subject: top.subject,
+          account: top.account,
+          expiresAt: Date.now() + LAST_EMAIL_TTL_MS,
+        };
         const summary = await summarizeEmailsForVoice(emails, unread);
         if (stale()) { isProcessing.current = false; return; }
         return await speakAndFinish(summary);
@@ -1257,45 +1486,294 @@ export function useVoiceAssistant() {
         return await speakAndFinish("Google account disconnected.");
       }
 
-      // ── Calendar event creation ──────────────────────────────────────────
+      // ── Calendar: confirm a pending event from the prior turn ────────────
+      // Runs BEFORE the calendar-command detector so that a bare "yes"/"no"
+      // after a proposal goes to the right branch. Expired or ambiguous input
+      // clears the pending and falls through to normal processing.
+      {
+        const pending = pendingCalendarEvent.current;
+        if (pending) {
+          if (Date.now() > pending.expiresAt) {
+            pendingCalendarEvent.current = null;
+            console.log("[VA] pending calendar expired — falling through");
+          } else {
+            const conf = detectConfirmation(finalText);
+            if (conf === "yes") {
+              pendingCalendarEvent.current = null;
+              const result = await createCalendarEvent({
+                title: pending.title,
+                startDate: pending.startDate,
+                endDate: pending.endDate,
+                allDay: pending.allDay,
+                location: pending.location,
+              });
+              if (stale()) { isProcessing.current = false; return; }
+              if (!result.ok) {
+                const msg =
+                  result.reason === "permission"
+                    ? `I don't have calendar access. Grant it in app permissions.`
+                    : result.reason === "no_calendar"
+                      ? `No writable calendar found on this device.`
+                      : `Couldn't save that event. ${result.message}`;
+                return await speakAndFinish(msg);
+              }
+              return await speakAndFinish(
+                formatEventConfirmation(
+                  pending.title,
+                  pending.startDate,
+                  !!pending.allDay,
+                ),
+              );
+            }
+            if (conf === "no") {
+              pendingCalendarEvent.current = null;
+              return await speakAndFinish(`Okay, skipped.`);
+            }
+            // Ambiguous — drop the pending and fall through. Don't wedge the
+            // conversation waiting for a clean yes/no.
+            pendingCalendarEvent.current = null;
+            console.log("[VA] pending calendar dropped — non-confirmation input");
+          }
+        }
+      }
+
+      // ── Calendar event creation (two-turn: summarize, then confirm) ──────
       if (isCalendarCommand(finalText)) {
         const parsed = await parseEventFromSpeech(finalText);
-        if (stale()) {
-          isProcessing.current = false;
-          return;
-        }
+        if (stale()) { isProcessing.current = false; return; }
         if (!parsed) {
           return await speakAndFinish(
-            `I need a clearer time for that. When should it go?`,
+            `I couldn't nail down the time. Try "tomorrow at 1 PM" or "Friday 3 to 4 PM".`,
           );
         }
-        const result = await createCalendarEvent({
+        // Preflight permission/writable-calendar check before asking the user
+        // to confirm an event we couldn't save anyway. Prompts for Android
+        // calendar permission here on first use, same as today — just earlier.
+        const avail = await ensureCalendarWritable();
+        if (stale()) { isProcessing.current = false; return; }
+        if (!avail.ok) {
+          return await speakAndFinish(
+            avail.reason === "permission"
+              ? `I don't have calendar access. Grant it in app permissions.`
+              : `No writable calendar found on this device.`,
+          );
+        }
+        const startDate = new Date(parsed.startISO);
+        const endDate = new Date(parsed.endISO);
+        pendingCalendarEvent.current = {
           title: parsed.title,
-          startDate: new Date(parsed.startISO),
-          endDate: new Date(parsed.endISO),
+          startDate,
+          endDate,
           allDay: parsed.allDay,
           location: parsed.location,
-        });
-        if (stale()) {
+          expiresAt: Date.now() + PENDING_CAL_TTL_MS,
+        };
+        const proposal = formatEventProposal(
+          parsed.title,
+          startDate,
+          endDate,
+          !!parsed.allDay,
+          parsed.location,
+        );
+        return await speakAndFinish(`${proposal}. Should I create it?`);
+      }
+
+      // ── Tasks (create / list / complete) ─────────────────────────────────
+      const taskCmd = detectTaskCommand(finalText);
+      if (taskCmd) {
+        try {
+          if (taskCmd.kind === "add") {
+            const row = await createTask(taskCmd.title, { source: "voice" });
+            if (stale()) { isProcessing.current = false; return; }
+            return await speakAndFinish(
+              row
+                ? `Task logged: ${row.title}.`
+                : `Couldn't save that task. Check your connection.`,
+            );
+          }
+          if (taskCmd.kind === "list") {
+            const rows = await listOpenTasks(10);
+            if (stale()) { isProcessing.current = false; return; }
+            if (rows.length === 0) {
+              return await speakAndFinish(`Manifest is clear. No open tasks.`);
+            }
+            const titles = rows.map((r) => r.title).join("; ");
+            const count = rows.length === 1 ? "One task" : `${rows.length} tasks`;
+            return await speakAndFinish(`${count} open: ${titles}.`);
+          }
+          if (taskCmd.kind === "done") {
+            const row = await completeTaskByTitle(taskCmd.titleFragment);
+            if (stale()) { isProcessing.current = false; return; }
+            return await speakAndFinish(
+              row
+                ? `Marked complete: ${row.title}.`
+                : `No open task matching "${taskCmd.titleFragment}".`,
+            );
+          }
+        } catch (e: any) {
+          console.warn("[tasks] command failed:", e?.message);
+          if (mounted.current) {
+            setError("Task backend is offline. Try again shortly.");
+            setStatusSafe("error", "tasks-failed");
+          }
           isProcessing.current = false;
           return;
         }
-        if (!result.ok) {
-          const msg =
-            result.reason === "permission"
-              ? `I don't have calendar access. Grant it in app permissions.`
-              : result.reason === "no_calendar"
-                ? `No writable calendar found on this device.`
-                : `Couldn't save that event. ${result.message}`;
-          return await speakAndFinish(msg);
+      }
+
+      // ── Reminders (create / list) ────────────────────────────────────────
+      const reminderCmd = detectReminderCommand(finalText);
+      if (reminderCmd) {
+        try {
+          if (reminderCmd.kind === "create") {
+            const when = parseReminderTime(reminderCmd.timeSpec);
+            if (!when) {
+              return await speakAndFinish(
+                `I couldn't make sense of "${reminderCmd.timeSpec}". Try "at 3pm", "in 30 minutes", or "tomorrow at 9am".`,
+              );
+            }
+            const row = await createReminder(reminderCmd.title, when);
+            if (stale()) { isProcessing.current = false; return; }
+            return await speakAndFinish(
+              row
+                ? `Reminder set for ${formatReminderTime(when)}: ${row.title}.`
+                : `Couldn't save that reminder. Check your connection.`,
+            );
+          }
+          if (reminderCmd.kind === "list") {
+            const rows = await listTodayReminders();
+            if (stale()) { isProcessing.current = false; return; }
+            if (rows.length === 0) {
+              return await speakAndFinish(`Nothing on the reminder list today.`);
+            }
+            const parts = rows.map(
+              (r) => `${formatReminderTime(new Date(r.remind_at))}: ${r.title}`,
+            );
+            const count = rows.length === 1 ? `One reminder today` : `${rows.length} reminders today`;
+            return await speakAndFinish(`${count}. ${parts.join(". ")}.`);
+          }
+        } catch (e: any) {
+          console.warn("[reminders] command failed:", e?.message);
+          if (mounted.current) {
+            setError("Reminder backend is offline. Try again shortly.");
+            setStatusSafe("error", "reminders-failed");
+          }
+          isProcessing.current = false;
+          return;
         }
+      }
+
+      // ── Email: confirm a pending draft/reply from the prior turn ─────────
+      // Same pattern as the calendar pending-check. Runs BEFORE detectEmailCommand
+      // so a bare "yes"/"no" after a read-back is dispatched correctly.
+      {
+        const pending = pendingEmail.current;
+        if (pending) {
+          if (Date.now() > pending.expiresAt) {
+            pendingEmail.current = null;
+            console.log("[VA] pending email expired — falling through");
+          } else {
+            const conf = detectConfirmation(finalText);
+            if (conf === "yes") {
+              pendingEmail.current = null;
+              try {
+                const result =
+                  pending.kind === "draft"
+                    ? await sendEmail(pending.to, pending.subject, pending.body, pending.account)
+                    : await replyToThread(pending.threadId, pending.body, pending.account);
+                if (stale()) { isProcessing.current = false; return; }
+                if (!result.ok) {
+                  return await speakAndFinish(
+                    `Couldn't send that. ${result.error}.`,
+                  );
+                }
+                return await speakAndFinish(
+                  pending.kind === "draft"
+                    ? `Sent to ${pending.to}.`
+                    : `Reply sent.`,
+                );
+              } catch (e: any) {
+                console.warn("[email] send failed:", e?.message);
+                return await speakAndFinish(`Send failed. Try again.`);
+              }
+            }
+            if (conf === "no") {
+              pendingEmail.current = null;
+              return await speakAndFinish(`Okay, discarded.`);
+            }
+            pendingEmail.current = null;
+            console.log("[VA] pending email dropped — non-confirmation input");
+          }
+        }
+      }
+
+      // ── Email (two-turn: draft, read back, then confirm) ─────────────────
+      const emailCmd = detectEmailCommand(finalText);
+      if (emailCmd) {
+        if (emailCmd.kind === "draft") {
+          const to = normalizeSpokenAddress(emailCmd.to);
+          if (!to) {
+            return await speakAndFinish(
+              `I need a full email address — say it like "luke at gmail dot com".`,
+            );
+          }
+          const body = emailCmd.message;
+          // Structured form ("... Subject: ... Body: ...") dictates subject;
+          // legacy "saying" form falls back to deriving from the body.
+          const subject = emailCmd.subject?.trim() || deriveSubject(body);
+          pendingEmail.current = {
+            kind: "draft",
+            to,
+            subject,
+            body,
+            account: undefined, // primary account
+            expiresAt: Date.now() + PENDING_EMAIL_TTL_MS,
+          };
+          return await speakAndFinish(
+            `Drafted to ${to}, subject "${subject}". Body: ${body}. Send it?`,
+          );
+        }
+        // kind === "reply"
+        const target = lastDiscussedEmail.current;
+        if (!target || Date.now() > target.expiresAt) {
+          lastDiscussedEmail.current = null;
+          return await speakAndFinish(
+            `I don't have an email in focus. Check your inbox first, then tell me what to say.`,
+          );
+        }
+        pendingEmail.current = {
+          kind: "reply",
+          threadId: target.threadId,
+          replyingTo: target.from,
+          body: emailCmd.message,
+          account: target.account,
+          expiresAt: Date.now() + PENDING_EMAIL_TTL_MS,
+        };
         return await speakAndFinish(
-          formatEventConfirmation(
-            parsed.title,
-            new Date(parsed.startISO),
-            !!parsed.allDay,
-          ),
+          `Replying to ${target.from} with: ${emailCmd.message}. Send it?`,
         );
+      }
+
+      // ── Daily synthesis (briefing: calendar + email + tasks + reminders) ─
+      // Hard-wired orchestration, not the general GPT flow. One shaped call.
+      if (detectSynthesisCommand(finalText)) {
+        try {
+          const briefing = await runDailySynthesis();
+          if (stale()) { isProcessing.current = false; return; }
+          if (!briefing) {
+            return await speakAndFinish(
+              `Nothing material today. Context was thin across the board.`,
+            );
+          }
+          return await speakAndFinish(briefing);
+        } catch (e: any) {
+          console.warn("[synthesis] failed:", e?.message);
+          if (mounted.current) {
+            setError("Briefing failed. Try again shortly.");
+          }
+          isProcessing.current = false;
+          return;
+        }
       }
 
       // ── Normal GPT flow ───────────────────────────────────────────────────
@@ -1305,8 +1783,18 @@ export function useVoiceAssistant() {
       const ttsQueue: Promise<string>[] = [];
       let streamDone = false;
       let pendingSentence = "";
-      const MIN_TTS_WORDS = 6;
-      const MAX_TTS_INFLIGHT = 2;
+      // Guards against double-adding the assistant turn. The stream's .then()
+      // publishes text to the UI as soon as it resolves; the post-drain path
+      // is the fallback for stream-errored turns where .then() didn't fire.
+      let textPublished = false;
+      // First chunk fires sooner to minimize time-to-first-audio. Subsequent
+      // chunks batch at the larger threshold so continuous playback stays
+      // smooth (short chunks create audible choppiness).
+      const MIN_TTS_WORDS_FIRST = 3;
+      const MIN_TTS_WORDS_REST = 6;
+      // 3 concurrent fetches keeps chunk N+2 ready before chunk N+1 finishes,
+      // closing the audible gap between chunks on long replies.
+      const MAX_TTS_INFLIGHT = 3;
       let ttsInflight = 0;
       const ttsWaiters: Array<() => void> = [];
       const acquireTtsSlot = async () => {
@@ -1332,25 +1820,27 @@ export function useVoiceAssistant() {
         const idx = ttsQueue.length;
         const t0 = Date.now();
         console.log(
-          `[TTS] fetch#${idx} queued words=${trimmed.split(/\s+/).length}`,
+          `[BG-AUDIO TTS turn=${turnId} idx=${idx}] queued words=${trimmed.split(/\s+/).length} appState=${AppState.currentState}`,
         );
         const gated = (async () => {
           await acquireTtsSlot();
           try {
             console.log(
-              `[TTS] fetch#${idx} start (waited ${Date.now() - t0}ms)`,
+              `[BG-AUDIO TTS turn=${turnId} idx=${idx}] fetch start (waited ${Date.now() - t0}ms) appState=${AppState.currentState}`,
             );
             const uri = await synthesizeSpeech(
               trimmed,
               `tts-${myGen}-${idx}.mp3`,
               currentVoice(),
             );
-            console.log(`[TTS] fetch#${idx} done in ${Date.now() - t0}ms`);
+            console.log(
+              `[BG-AUDIO TTS turn=${turnId} idx=${idx}] fetch done in ${Date.now() - t0}ms appState=${AppState.currentState}`,
+            );
             bumpProgress();
             return uri;
           } catch (err: any) {
             console.warn(
-              `[TTS] fetch#${idx} FAILED in ${Date.now() - t0}ms:`,
+              `[BG-AUDIO TTS turn=${turnId} idx=${idx}] FAILED in ${Date.now() - t0}ms appState=${AppState.currentState}:`,
               err?.message,
             );
             throw err;
@@ -1369,11 +1859,14 @@ export function useVoiceAssistant() {
         buildHistorySlice(imageSnap, finalText),
         fullContext,
         (sentence) => {
+          if (timings.ttfs == null) timings.ttfs = Date.now() - turnStartedAt;
           bumpProgress();
           const combined =
             (pendingSentence ? pendingSentence + " " : "") + sentence.trim();
           const words = combined.split(/\s+/);
-          if (words.length < MIN_TTS_WORDS) {
+          const threshold =
+            ttsQueue.length === 0 ? MIN_TTS_WORDS_FIRST : MIN_TTS_WORDS_REST;
+          if (words.length < threshold) {
             pendingSentence = combined;
             return;
           }
@@ -1388,6 +1881,20 @@ export function useVoiceAssistant() {
           if (pendingSentence) {
             pushTts(pendingSentence);
             pendingSentence = "";
+          }
+          // Publish text to the UI as soon as the stream resolves, without
+          // waiting for the audio drain. Backgrounded, failed chunks take
+          // ~4s each (watchdog + retry) before throwing; waiting for drain
+          // stretches visible-text latency by many seconds even when the
+          // stream itself arrived promptly.
+          if (
+            mounted.current &&
+            processingGen.current === myGen &&
+            text &&
+            !textPublished
+          ) {
+            textPublished = true;
+            addTurn("assistant", text);
           }
           return text;
         })
@@ -1438,24 +1945,32 @@ export function useVoiceAssistant() {
             return;
           }
           if (uri) {
-            console.log(`[PLAY turn=${turnId} idx=${playIdx}] start`);
+            if (timings.ttfa == null) timings.ttfa = Date.now() - turnStartedAt;
+            console.log(
+              `[BG-AUDIO PLAY turn=${turnId} idx=${playIdx}] start appState=${AppState.currentState}`,
+            );
             bumpProgress();
             const p0 = Date.now();
             try {
               await playSound(uri);
               console.log(
-                `[PLAY turn=${turnId} idx=${playIdx}] done in ${Date.now() - p0}ms`,
+                `[BG-AUDIO PLAY turn=${turnId} idx=${playIdx}] done in ${Date.now() - p0}ms appState=${AppState.currentState}`,
               );
             } catch (err: any) {
               chunkFailures++;
               console.warn(
-                `[PLAY turn=${turnId} idx=${playIdx}] threw:`,
+                `[BG-AUDIO PLAY turn=${turnId} idx=${playIdx}] threw appState=${AppState.currentState}:`,
                 err?.message,
               );
             }
             bumpProgress();
           }
           playIdx++;
+          if (streamDone && playIdx === ttsQueue.length) {
+            console.log(
+              `[TTS turn=${turnId}] final chunk played idx=${playIdx - 1}`,
+            );
+          }
         } else if (streamDone) {
           console.log(
             `[TTS turn=${turnId}] drain complete played=${playIdx} queued=${ttsQueue.length} failures=${chunkFailures}`,
@@ -1502,21 +2017,39 @@ export function useVoiceAssistant() {
         }
       }
 
-      try {
-        await releasePlaybackAudio();
-      } catch (e: any) {
-        console.warn("[VA] releasePlaybackAudio threw (post-drain):", e?.message);
-      }
+      // Fire-and-forget: setAudioModeAsync takes 100–300ms and we're about to
+      // hand audio session back to the native recorder anyway, which owns its
+      // own session. Awaiting this was pure dead air before resumeLoop.
+      releasePlaybackAudio().catch((e: any) =>
+        console.warn(
+          "[VA] releasePlaybackAudio async failed (post-drain):",
+          e?.message,
+        ),
+      );
 
       if (stale()) {
+        console.log(
+          `[VA turn=${turnId}] stale after drain — still attempting resume`,
+        );
         isProcessing.current = false;
+        await finishTurnToListening("post-drain-stale");
         return;
       }
       const assistantText = await streamPromise; // already resolved
 
-      if (mounted.current && assistantText) addTurn("assistant", assistantText);
+      if (mounted.current && assistantText && !textPublished) {
+        textPublished = true;
+        addTurn("assistant", assistantText);
+      }
 
-      if (stale()) return;
+      if (stale()) {
+        console.log(
+          `[VA turn=${turnId}] stale after streamPromise — still attempting resume`,
+        );
+        isProcessing.current = false;
+        await finishTurnToListening("post-stream-stale");
+        return;
+      }
       // Fire-and-forget memory write; surface failures so a broken backend
       // doesn't degrade silently (was: no .catch — unhandled rejection).
       void extractAndSaveMemory(finalText, assistantText).catch((err) =>
@@ -1527,16 +2060,21 @@ export function useVoiceAssistant() {
         turnsSinceCompress.current = 0;
         compressHistory();
       }
-      await new Promise<void>((r) => setTimeout(r, 800));
+      // Short settle lets Android release the audio focus playSound held
+      // before the recorder re-grabs it. 200ms is plenty; the old 800ms was
+      // the dominant source of end-of-turn dead air.
+      await new Promise<void>((r) => setTimeout(r, 200));
+      console.log(
+        `[VA TIMING turn=${turnId}] STT=${timings.sttMs ?? "?"}ms ` +
+          `TTFS=${timings.ttfs ?? "?"}ms ` +
+          `TTFA=${timings.ttfa ?? "?"}ms ` +
+          `total=${Date.now() - turnStartedAt}ms`,
+      );
       console.log(
         "[VA] post-TTS, about to resumeLoop, isLooping=",
         isLooping.current,
       );
-      if (isLooping.current) {
-        await resumeLoop();
-      } else {
-        if (mounted.current) setStatusSafe("idle", "loop-end");
-      }
+      await finishTurnToListening(`turn-${turnId}-end`);
       isProcessing.current = false;
       console.log("[VA] processRecording end, isProcessing reset");
     } catch (err: any) {
@@ -1564,6 +2102,9 @@ export function useVoiceAssistant() {
         setError(recoveryLine);
         setStatusSafe("error", "catch-fallback");
       }
+      // Guarantee the mic attempts to come back up even if speakAndFinish's
+      // own resume failed or the catch-fallback branch ran.
+      await finishTurnToListening("outer-catch-end");
     } finally {
       // Safety net: stale() early returns inside the try block above don't
       // explicitly reset isProcessing, and a future edit could miss one too.

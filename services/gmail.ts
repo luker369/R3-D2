@@ -69,6 +69,34 @@ export async function searchEmails(query: string, count = 5, label?: string): Pr
   return call('search', { q: query, count: String(count) }, label);
 }
 
+export type SendResult = { ok: true; account: string } | { ok: false; error: string; account?: string };
+
+/**
+ * Send a brand-new email. Routes to the first configured account unless a
+ * label is given. Body is URL-encoded; fine for voice-dictated messages
+ * (well under typical URL length limits).
+ */
+export async function sendEmail(
+  to: string,
+  subject: string,
+  body: string,
+  label?: string,
+): Promise<SendResult> {
+  return callRaw('send', { to, subject, body }, label);
+}
+
+/**
+ * Reply to an existing thread. The thread ID is the one returned in
+ * GmailMessage.id from fetchRecentEmails / fetchUnreadEmails.
+ */
+export async function replyToThread(
+  threadId: string,
+  body: string,
+  label?: string,
+): Promise<SendResult> {
+  return callRaw('reply', { threadId, body }, label);
+}
+
 async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -104,6 +132,51 @@ async function call(
 
   const count = Math.max(1, Number(extra.count) || 5);
   return merged.slice(0, count);
+}
+
+/**
+ * Single-account write call. Unlike `call()` which fans out across accounts
+ * for reads, writes pick exactly one account: the label-matched one, or the
+ * first configured account (primary/main) if no label given.
+ */
+async function callRaw(
+  action: string,
+  extra: Record<string, string>,
+  labelFilter?: string,
+): Promise<SendResult> {
+  const accounts = loadAccounts();
+  if (accounts.length === 0) return { ok: false, error: 'no_accounts' };
+
+  const target = labelFilter
+    ? accounts.find(a => a.label.toLowerCase() === labelFilter.toLowerCase())
+    : accounts[0];
+  if (!target) return { ok: false, error: `no_matching_label:${labelFilter}` };
+
+  const params = new URLSearchParams({ secret: target.secret, action, ...extra });
+  const url = `${target.url}?${params.toString()}`;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, 15_000);
+      const data = await res.json();
+      if (data && data.error) {
+        return { ok: false, error: String(data.error), account: target.label };
+      }
+      if (data && data.ok) {
+        console.log(`[gmail] ${action} ok via ${target.label}`);
+        return { ok: true, account: target.label };
+      }
+      return { ok: false, error: 'unexpected_response', account: target.label };
+    } catch (e: any) {
+      if (attempt === 0) {
+        await new Promise(r => setTimeout(r, 400 + Math.floor(Math.random() * 300)));
+        continue;
+      }
+      console.warn(`[gmail] ${action} failed on ${target.label}:`, e);
+      return { ok: false, error: e?.message ?? String(e), account: target.label };
+    }
+  }
+  return { ok: false, error: 'unreachable', account: target.label };
 }
 
 async function fetchOne(

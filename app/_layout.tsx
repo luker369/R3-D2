@@ -7,10 +7,7 @@ import { useEffect } from 'react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { R2_CHIRP_ON_EVERY_HOME_FOCUS } from '@/lib/r2-chirp-config';
 import { playR2Chirp } from '@/lib/r2-chirp';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { ErrorBoundary } from '@/components/error-boundary';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -26,11 +23,12 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
-      <StatusBar hidden />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerShown: false }} />
+
+        <StatusBar hidden />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

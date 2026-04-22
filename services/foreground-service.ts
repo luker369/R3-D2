@@ -4,6 +4,7 @@
  */
 
 import { AppState, NativeModules, Platform } from "react-native";
+import { ENABLE_FGS } from "@/lib/feature-flags";
 
 const TAG = "[FGS]";
 const CHANNEL_ID = "r2r3_channel";
@@ -49,6 +50,10 @@ export function isForegroundServiceRunning(): boolean {
  */
 export async function startForegroundService(): Promise<boolean> {
   if (Platform.OS !== "android") return false;
+  if (!ENABLE_FGS) {
+    console.log(TAG, "start short-circuit: ENABLE_FGS=false (kill switch)");
+    return false;
+  }
   if (running) {
     console.log(TAG, "start short-circuit: already running");
     return true;

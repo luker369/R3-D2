@@ -13,6 +13,7 @@
 
 import { supabase } from './supabase';
 import { getChatResponse } from './openai';
+import { ENABLE_MEMORY_EXTRACTION } from '@/lib/feature-flags';
 
 const TABLE = 'memory_entries';
 
@@ -154,10 +155,18 @@ export async function saveEntry(category: string, content: string): Promise<void
  * Save a single memory entry to Supabase.
  */
 const savedThisSession = new Set<string>();
+// Cap the dedup set so a long-running session doesn't grow it forever. The
+// dedup is a best-effort "already wrote this verbatim moments ago" guard, not
+// a correctness invariant — dropping the oldest 200 entries is fine.
+const SAVED_SESSION_MAX = 500;
 
 async function saveMemory(category: string, content: string): Promise<void> {
   const key = `${category}::${content.toLowerCase().trim()}`;
   if (savedThisSession.has(key)) return;
+  if (savedThisSession.size >= SAVED_SESSION_MAX) {
+    console.log('[memory] savedThisSession cap hit; clearing');
+    savedThisSession.clear();
+  }
   savedThisSession.add(key);
 
   const { error } = await supabase.from(TABLE).insert({ category, content });
@@ -185,6 +194,7 @@ export async function extractAndSaveMemory(
   userText: string,
   assistantText: string
 ): Promise<void> {
+  if (!ENABLE_MEMORY_EXTRACTION) return;
   const existing = memoryCached ?? '';
   const prompt = [
     {
@@ -204,7 +214,15 @@ export async function extractAndSaveMemory(
   ];
 
   try {
-    const result = await getChatResponse(prompt, undefined, undefined, 'gpt-5.4-mini');
+    // Fire-and-forget caller means nothing will ever time out this call
+    // for us — if OpenAI hangs, the closure (and the prompt) leaks. Race
+    // it with a 20s timeout so each extraction has a hard ceiling.
+    const result = await Promise.race([
+      getChatResponse(prompt, undefined, undefined, 'gpt-5.4-mini'),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error('extractAndSaveMemory timeout (20s)')), 20_000),
+      ),
+    ]);
 
     if (!result || result.trim() === 'null') return;
 

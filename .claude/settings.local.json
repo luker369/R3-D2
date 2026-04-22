@@ -51,7 +51,9 @@
       "Read(//c/Users/walke/.android//**)",
       "Bash(\"/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe\" -list -v -keystore /c/Users/walke/Desktop/WebDev/R2-D3/android/app/debug.keystore -storepass android)",
       "Bash(./gradlew.bat app:assembleDebug -x lint -x test --console=plain)",
-      "Bash(tasklist //FI \"IMAGENAME eq java.exe\")"
+      "Bash(tasklist //FI \"IMAGENAME eq java.exe\")",
+      "Bash(awk 'NR==127' plugins/with-voice-interaction.js)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }

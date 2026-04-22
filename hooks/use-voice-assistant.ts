@@ -245,6 +245,109 @@ export function useVoiceAssistant() {
   const resumeLoopRef = useRef<() => Promise<void>>(async () => {});
   const appWasInBackgroundRef = useRef(false);
 
+  // ── The gate ──────────────────────────────────────────────────────────────
+  // Mathematically serializes all recorder starts so concurrent callers
+  // (auto-start timer, assist-gesture URL handler, AppState resume,
+  // user press) cannot race the native recorder. Rule: startRecording()
+  // may only be called from inside ensureListeningLocked().
+  //
+  //   - startInFlightRef + startPromiseRef form the mutex.
+  //   - startEpochRef ensures only the current owner clears the lock
+  //     in finally — protects against a stale finally clearing a newer
+  //     owner's lock if epochs ever wrap or interleave.
+  //
+  // On success the gate sets status=listening. On failure it unrolls
+  // isLooping; the caller decides whether failure means "idle" (auto-start,
+  // resumeLoop) or "error" (press, assist). FGS lifecycle and custom error
+  // messages remain at the call sites.
+  const startInFlightRef = useRef(false);
+  const startPromiseRef = useRef<Promise<boolean> | null>(null);
+  const startEpochRef = useRef(0);
+
+  const ensureListeningLocked = useCallback(
+    async (reason: string): Promise<boolean> => {
+      // Branch 1: already active — short-circuit success.
+      if (isRecordingRef.current && statusRef.current === "listening") {
+        console.log(`[VA GATE ${reason}] short-circuit: already listening+recording`);
+        return true;
+      }
+
+      // Branch 2: another start is in flight — join its result.
+      if (startInFlightRef.current && startPromiseRef.current) {
+        console.log(`[VA GATE ${reason}] join: another start in flight`);
+        const joined = await startPromiseRef.current;
+        console.log(`[VA GATE ${reason}] join result =>`, joined);
+        return joined;
+      }
+
+      // Branch 3: become the owner.
+      startInFlightRef.current = true;
+      const myEpoch = ++startEpochRef.current;
+      console.log(`[VA GATE ${reason}] acquired lock epoch=${myEpoch}`);
+
+      // Assert loop intent before native call so a concurrent observer
+      // sees we're starting, not stopped.
+      isLooping.current = true;
+      setLooping(true);
+
+      const work = (async (): Promise<boolean> => {
+        try {
+          const started = await startRecording();
+          console.log(
+            `[VA GATE ${reason}] startRecording =>`,
+            started,
+            `recorderRunning=`,
+            isRecordingRef.current,
+            `epoch=${myEpoch}`,
+          );
+
+          // Branch 4 + 5: true success or race-loser-success
+          // (startRecording returned false but recorder is running because
+          // a concurrent call won the native race — same outcome for us).
+          if (started || isRecordingRef.current) {
+            if (mounted.current) {
+              setStatusSafe(
+                "listening",
+                `gate:${reason}${started ? "" : ":race-winner"}`,
+              );
+            }
+            return true;
+          }
+
+          // Branch 6: real failure — recorder genuinely not running.
+          console.log(`[VA GATE ${reason}] real failure`);
+          isLooping.current = false;
+          setLooping(false);
+          return false;
+        } catch (e) {
+          // Branch 7: exception path
+          console.warn(`[VA GATE ${reason}] threw:`, e);
+          isLooping.current = false;
+          setLooping(false);
+          return false;
+        } finally {
+          // Only the current owner clears the lock.
+          if (startEpochRef.current === myEpoch) {
+            startInFlightRef.current = false;
+            startPromiseRef.current = null;
+            console.log(`[VA GATE ${reason}] released lock epoch=${myEpoch}`);
+          } else {
+            console.log(
+              `[VA GATE ${reason}] epoch superseded (current=${startEpochRef.current}, mine=${myEpoch}) — not clearing lock`,
+            );
+          }
+        }
+      })();
+
+      startPromiseRef.current = work;
+      return work;
+    },
+    [setStatusSafe, startRecording, isRecordingRef],
+  );
+
+  const ensureListeningLockedRef = useRef(ensureListeningLocked);
+  ensureListeningLockedRef.current = ensureListeningLocked;
+
   // Google OAuth — triggered by voice command ("connect Gmail", "sign into Google")
   const promptGoogleSignIn = useGoogleSignIn({
     onConnected: () => {
@@ -262,25 +365,10 @@ export function useVoiceAssistant() {
     const timer = setTimeout(async () => {
       if (!mounted.current) return;
       console.log("[VA] auto-start firing (3s post-mount)");
-      isLooping.current = true;
-      setLooping(true);
       await startForegroundService();
-      const started = await startRecording();
-      console.log("[VA] auto-start startRecording =>", started);
-      // Race-loss detection: if startRecording returned false but the
-      // recorder is actually running, another concurrent starter (usually
-      // ensureListening from an assist-gesture URL) already won the native
-      // race. Don't clobber their "listening" state with "idle".
-      if (!started && isRecordingRef.current) {
-        console.log(
-          "[VA] auto-start: startRecording=false but recorder is already running — race-loss, preserving state",
-        );
-        return;
-      }
-      if (mounted.current) setStatusSafe(started ? "listening" : "idle", "auto-start");
-      if (!started) {
-        isLooping.current = false;
-        setLooping(false);
+      const ok = await ensureListeningLockedRef.current("auto-start");
+      if (!ok && mounted.current) {
+        setStatusSafe("idle", "auto-start:fail");
         stopForegroundService();
       }
     }, 3000);
@@ -309,18 +397,17 @@ export function useVoiceAssistant() {
   async function playSound(uri: string): Promise<void> {
     if (isLooping.current) {
       try {
-        // shouldPlayInBackground=false (temporarily, for diagnosis). With our
-        // FGS type limited to MICROPHONE, Android 14+ appears to deny an
-        // audio session when shouldPlayInBackground=true — the player reaches
-        // "ready/playing" but the playhead never advances and the state
-        // drops to "idle". Flipping this off restores foreground playback;
-        // the real fix is adding MEDIA_PLAYBACK to the FGS service types.
+        // shouldPlayInBackground=true paired with MEDIA_PLAYBACK in the FGS
+        // service types (see services/foreground-service.ts). Without the
+        // FGS type, Android 14+ silently rejected the audio session and the
+        // player stalled (ready -> idle, currentTime never advanced) the
+        // moment the app was hidden.
         await setAudioModeAsync({
           allowsRecording: false,
           playsInSilentMode: true,
           interruptionMode: "mixWithOthers",
           shouldRouteThroughEarpiece: false,
-          shouldPlayInBackground: false,
+          shouldPlayInBackground: true,
         });
       } catch (e: any) {
         console.warn("[VA] playSound setAudioModeAsync threw:", e?.message);
@@ -441,14 +528,12 @@ export function useVoiceAssistant() {
       mounted.current,
     );
     if (!isLooping.current || !mounted.current) return;
-    let started = await startRecording();
-    console.log("[VA] resumeLoop startRecording returned", started);
-    if (!started) {
+    let ok = await ensureListeningLockedRef.current("resumeLoop");
+    if (!ok && mounted.current) {
       await new Promise<void>((r) => setTimeout(r, 500));
-      started = await startRecording();
-      console.log("[VA] resumeLoop retry returned", started);
+      ok = await ensureListeningLockedRef.current("resumeLoop:retry");
     }
-    if (mounted.current) setStatusSafe(started ? "listening" : "idle", "resumeLoop");
+    if (!ok && mounted.current) setStatusSafe("idle", "resumeLoop:fail");
   }
 
   resumeLoopRef.current = resumeLoop;
@@ -891,12 +976,10 @@ export function useVoiceAssistant() {
       return;
     }
 
-    // shouldPlayInBackground=false (temporarily, for diagnosis). See
-    // matching comment in playSound above — FGS type MICROPHONE is
-    // incompatible with shouldPlayInBackground=true on Android 14+, which
-    // manifests as a native player that reaches "ready/playing" but never
-    // advances currentTime. Background playback is sacrificed until we add
-    // MEDIA_PLAYBACK to the FGS service types.
+    // shouldPlayInBackground=true paired with MEDIA_PLAYBACK in the FGS
+    // service types (see services/foreground-service.ts). See matching
+    // comment in playSound above — without the FGS type, Android 14+
+    // silently rejected the audio session.
     //
     // Wrapped in try/catch: if setAudioModeAsync throws here we still want
     // the turn to proceed (playback may degrade but text path still works);
@@ -907,10 +990,10 @@ export function useVoiceAssistant() {
         playsInSilentMode: true,
         interruptionMode: "mixWithOthers",
         shouldRouteThroughEarpiece: false,
-        shouldPlayInBackground: false,
+        shouldPlayInBackground: true,
       });
       console.log(
-        "[VA] audio mode set: playback enabled, shouldPlayInBackground=false",
+        "[VA] audio mode set: playback enabled, shouldPlayInBackground=true",
       );
     } catch (e: any) {
       console.warn("[VA] processRecording setAudioModeAsync threw:", e?.message);
@@ -1560,17 +1643,11 @@ export function useVoiceAssistant() {
       stopForegroundService();
     } else if (status === "idle" || status === "error") {
       console.log("[VA] handlePress branch: start-loop");
-      // Start the loop
-      isLooping.current = true;
-      setLooping(true);
       setError(null);
       await startForegroundService();
-      const started = await startRecording();
-      if (started) {
-        setStatusSafe("listening", "press:start");
-      } else {
-        isLooping.current = false;
-        setLooping(false);
+      const ok = await ensureListeningLockedRef.current("press");
+      if (!ok) {
+        stopForegroundService();
         setError(
           "Microphone access denied. Enable it in Android Settings → Apps → R3-D2 → Permissions.",
         );
@@ -1602,32 +1679,15 @@ export function useVoiceAssistant() {
     }
     const needsStart = !isLooping.current;
     console.log("[VA] ensureListening branch: start (needsStart=", needsStart, ")");
-    if (needsStart) {
-      isLooping.current = true;
-      setLooping(true);
-      setError(null);
-    }
+    if (needsStart) setError(null);
     void (async () => {
       if (needsStart) await startForegroundService();
-      const started = await startRecording();
+      const ok = await ensureListeningLockedRef.current("assist");
       if (!mounted.current) return;
-      if (started) {
-        setStatusSafe("listening", "assist:listening");
-        return;
+      if (!ok) {
+        // Gate already unrolled isLooping; assist surfaces failure as error.
+        setStatusSafe("error", "assist:fail");
       }
-      // Race-loss detection: if startRecording returned false but the
-      // recorder is actually running, a concurrent starter (usually the
-      // auto-start timer) already won the native race. Don't clobber their
-      // "listening" state with "error (assist:fail)".
-      if (isRecordingRef.current) {
-        console.log(
-          "[VA] ensureListening: startRecording=false but recorder is already running — race-loss, preserving state",
-        );
-        return;
-      }
-      isLooping.current = false;
-      setLooping(false);
-      setStatusSafe("error", "assist:fail");
     })();
   };
 

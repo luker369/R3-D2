@@ -118,6 +118,12 @@ export async function startForegroundService(): Promise<boolean> {
           asForegroundService: true,
           foregroundServiceTypes: [
             AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MICROPHONE,
+            // MEDIA_PLAYBACK is required on Android 14+ for the audio
+            // session to keep playing while backgrounded; without it,
+            // setAudioModeAsync({ shouldPlayInBackground: true }) is
+            // silently rejected and the player stalls (ready -> idle,
+            // currentTime never advances) the moment the app is hidden.
+            AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
           ],
           smallIcon: "ic_launcher",
           ongoing: true,

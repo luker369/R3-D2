@@ -449,9 +449,11 @@ export function useVoiceAssistant() {
         clearInterval(stallCheck);
         sub.remove();
         if (currentSound.current === player) currentSound.current = null;
-        try {
-          player.remove();
-        } catch {}
+        // Pause before remove so Android releases audio focus cleanly.
+        // remove() mid-play can leave focus held, which silently blocks
+        // the next turn's player.play() from producing sound.
+        try { player.pause(); } catch {}
+        try { player.remove(); } catch {}
         resolve();
       };
       const stallCheck = setInterval(() => {
@@ -623,6 +625,32 @@ export function useVoiceAssistant() {
     } finally {
       isProcessing.current = false;
       console.log("[VA] speakAndFinish finally: isProcessing=false");
+    }
+  }
+
+  // Rarely-used silent-chat path. Bypasses transcription/wake-word/hallucination
+  // filter/command detection — typed text doesn't have those problems. Also
+  // skips memory/calendar injection for simplicity; typed chat is best-effort.
+  async function sendText(raw: string): Promise<void> {
+    const text = raw.trim();
+    if (!text) return;
+    if (isProcessing.current || isRecordingRef.current) {
+      console.log("[VA] sendText ignored: busy");
+      return;
+    }
+    const imageSnap = pendingImage;
+    if (imageSnap) setPendingImage(null);
+    addTurn("user", text, imageSnap?.uri);
+    isProcessing.current = true;
+    if (mounted.current) setStatusSafe("processing", "sendText");
+    try {
+      const reply = await getChatResponse(history.current);
+      if (!mounted.current) return;
+      await speakAndFinish(reply);
+    } catch (e: any) {
+      console.warn("[VA] sendText failed:", e?.message);
+      isProcessing.current = false;
+      if (mounted.current) setStatusSafe("idle", "sendText:fail");
     }
   }
 
@@ -1382,33 +1410,95 @@ export function useVoiceAssistant() {
 
       if (mounted.current) setStatusSafe("speaking", "stream-ready");
 
-      // Drain the TTS queue as sentences arrive, without waiting for streaming to finish
+      // Drain the TTS queue as sentences arrive, without waiting for streaming to finish.
+      // Per-chunk failures (fetch reject, body timeout, or playback throw) are isolated
+      // so one bad chunk doesn't abort the whole reply. Previously a single rejected
+      // ttsQueue item surfaced to the outer catch and reduced the turn to a recovery
+      // line — this is the "text-only response" symptom.
       let playIdx = 0;
+      let chunkFailures = 0;
       while (true) {
         if (stale()) {
           isProcessing.current = false;
           return;
         }
         if (playIdx < ttsQueue.length) {
-          const uri = await ttsQueue[playIdx];
+          let uri: string | null = null;
+          try {
+            uri = await ttsQueue[playIdx];
+          } catch (err: any) {
+            chunkFailures++;
+            console.warn(
+              `[TTS turn=${turnId} idx=${playIdx}] fetch rejected, skipping:`,
+              err?.message,
+            );
+          }
           if (stale()) {
             isProcessing.current = false;
             return;
           }
-          console.log(`[TTS] play#${playIdx} start`);
-          bumpProgress();
-          const p0 = Date.now();
-          await playSound(uri);
-          console.log(`[TTS] play#${playIdx} done in ${Date.now() - p0}ms`);
-          bumpProgress();
+          if (uri) {
+            console.log(`[PLAY turn=${turnId} idx=${playIdx}] start`);
+            bumpProgress();
+            const p0 = Date.now();
+            try {
+              await playSound(uri);
+              console.log(
+                `[PLAY turn=${turnId} idx=${playIdx}] done in ${Date.now() - p0}ms`,
+              );
+            } catch (err: any) {
+              chunkFailures++;
+              console.warn(
+                `[PLAY turn=${turnId} idx=${playIdx}] threw:`,
+                err?.message,
+              );
+            }
+            bumpProgress();
+          }
           playIdx++;
         } else if (streamDone) {
           console.log(
-            `[TTS] drain complete, played=${playIdx} queued=${ttsQueue.length}`,
+            `[TTS turn=${turnId}] drain complete played=${playIdx} queued=${ttsQueue.length} failures=${chunkFailures}`,
           );
           break;
         } else {
           await new Promise<void>((r) => setTimeout(r, 50));
+        }
+      }
+
+      // Full-reply fallback: if every per-sentence TTS failed (fetch reject,
+      // body timeout, or playback throw) but the chat stream itself completed,
+      // try once more with the full assistant text as a single request. This
+      // rescues turns that would otherwise end in silence after the user has
+      // already seen the "speaking" status.
+      if (
+        chunkFailures > 0 &&
+        chunkFailures === playIdx &&
+        !stale()
+      ) {
+        try {
+          const fullReply = await streamPromise;
+          if (fullReply && !stale()) {
+            console.log(
+              `[TTS turn=${turnId}] all ${chunkFailures} chunks failed — attempting full-reply fallback`,
+            );
+            const fbUri = await synthesizeSpeech(
+              fullReply,
+              `tts-${myGen}-fallback.mp3`,
+              currentVoice(),
+            );
+            if (!stale()) {
+              bumpProgress();
+              await playSound(fbUri);
+              bumpProgress();
+              console.log(`[TTS turn=${turnId}] fallback playback complete`);
+            }
+          }
+        } catch (err: any) {
+          console.warn(
+            `[TTS turn=${turnId}] full-reply fallback failed:`,
+            err?.message,
+          );
         }
       }
 
@@ -1718,5 +1808,6 @@ export function useVoiceAssistant() {
     handlePress,
     pendingImage,
     setPendingImage,
+    sendText,
   };
 }

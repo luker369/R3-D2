@@ -23,7 +23,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -80,6 +80,9 @@
       ],
       "./plugins/with-voice-interaction",
       "./plugins/with-notifee-foreground-types",
+      "./plugins/with-notifee-repo",
+      "./plugins/with-immersive-mode",
+      "./plugins/with-audio-stream",
       "expo-secure-store"
     ],
     "experiments": {

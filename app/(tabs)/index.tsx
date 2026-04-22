@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -12,7 +12,17 @@ import { R2_CHIRP_ON_EVERY_HOME_FOCUS } from '@/lib/r2-chirp-config';
 import { playR2Chirp } from '@/lib/r2-chirp';
 
 export default function HomeScreen() {
-  const { status, transcript, error, looping, handlePress, pendingImage, setPendingImage } = useVoiceAssistant();
+  const {
+    status,
+    transcript,
+    error,
+    looping,
+    handlePress,
+    pendingImage,
+    setPendingImage,
+    sendText,
+  } = useVoiceAssistant();
+  const [pendingText, setPendingText] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -32,6 +42,13 @@ export default function HomeScreen() {
     const uri = result.assets[0].uri;
     const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
     setPendingImage({ uri, base64 });
+  }
+
+  function doSend() {
+    const t = pendingText.trim();
+    if (!t) return;
+    setPendingText('');
+    void sendText(t);
   }
 
   return (
@@ -54,16 +71,32 @@ export default function HomeScreen() {
       )}
 
       <View style={styles.bottomRow}>
-        <TouchableOpacity style={styles.cameraBtn} onPress={pickImage}>
-          <Text style={styles.cameraIcon}>📎</Text>
+        <ListenButton status={status} looping={looping} onPress={handlePress} />
+      </View>
+
+      <View style={styles.inputPill}>
+        <TouchableOpacity style={styles.clipBtn} onPress={pickImage}>
+          <Text style={styles.clipIcon}>📎</Text>
           {pendingImage && (
             <Image source={{ uri: pendingImage.uri }} style={styles.thumb} />
           )}
         </TouchableOpacity>
 
-        <ListenButton status={status} looping={looping} onPress={handlePress} />
+        <TextInput
+          style={styles.textInput}
+          value={pendingText}
+          onChangeText={setPendingText}
+          onSubmitEditing={doSend}
+          placeholder="Type to R2…"
+          placeholderTextColor="rgba(255,255,255,0.4)"
+          returnKeyType="send"
+          blurOnSubmit
+          multiline={false}
+        />
 
-        <View style={styles.cameraBtn} />
+        <TouchableOpacity style={styles.sendBtn} onPress={doSend}>
+          <Text style={styles.sendIcon}>➤</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -105,22 +138,55 @@ const styles = StyleSheet.create({
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 32,
-    paddingVertical: 36,
+    paddingTop: 24,
+    paddingBottom: 16,
   },
-  cameraBtn: {
-    width: 48,
+  inputPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  clipBtn: {
+    width: 40,
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cameraIcon: {
-    fontSize: 26,
+  clipIcon: {
+    fontSize: 22,
+  },
+  textInput: {
+    flex: 1,
+    minHeight: 52,
+    color: '#fff',
+    fontSize: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  sendBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  sendIcon: {
+    fontSize: 14,
+    color: '#fff',
+    marginLeft: 2,
   },
   thumb: {
     position: 'absolute',
-    top: -36,
+    top: -46,
     width: 44,
     height: 44,
     borderRadius: 8,

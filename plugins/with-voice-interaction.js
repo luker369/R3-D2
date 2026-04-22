@@ -107,7 +107,6 @@ import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionSessionService
 import android.util.Log
-import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class AssistInteractionSessionService : VoiceInteractionSessionService() {
     override fun onNewSession(args: Bundle?): VoiceInteractionSession {
@@ -124,15 +123,8 @@ class AssistInteractionSession(context: Context) : VoiceInteractionSession(conte
         // foreground MainActivity, warm or cold. This is the ONLY site in the
         // app that launches MainActivity, so UI promotion remains scoped to the
         // assist gesture (no voice-pipeline or background event can surface it).
-        val reactCtx = AudioStreamModule.currentReactContext()
-        Log.d(
-            "R2Assist",
-            "AudioStreamModule.currentReactContext=" +
-                "\${if (reactCtx != null) "non-null (warm)" else "null (cold)"} — launching MainActivity"
-        )
-
         // URL uses a query string instead of a path so expo-router resolves
-        // it to the home route (tabs) instead of looking for a `/assist` route
+        // it to the home route (tabs) instead of looking for a \`/assist\` route
         // file. The "assist" marker is preserved in the query so the JS
         // Linking handler can still detect it and arm the listener.
         val intent = Intent(context, MainActivity::class.java).apply {

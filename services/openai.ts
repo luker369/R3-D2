@@ -200,8 +200,48 @@ export async function getChatResponse(history: Message[], memoryContext?: string
   return (json.choices[0].message.content as string).trim();
 }
 
+// Pre-model gate for the hosted web_search_preview tool. Runs in JS against
+// the latest user message; when it returns false, the tool is omitted from
+// the request body entirely so the model physically cannot invoke it. This
+// is stricter than prompting the model to self-gate — it prevents the model
+// from spending a search call on casual turns at all.
+const SEARCH_TRIGGERS: RegExp[] = [
+  // Explicit request
+  /\b(search|look\s+(it|this|that)\s+up|look\s+up|google|find\s+online|look\s+online)\b/i,
+  // Current events / recency
+  /\b(latest|recent|recently|today|yesterday|tonight|this\s+(week|morning|evening|afternoon)|breaking|news|headline|announced|just\s+happened)\b/i,
+  // Real-time data
+  /\b(weather|temperature|forecast|price|stocks?|ticker|score|traffic|flight|open\s+now|hours|now|currently|right\s+now)\b/i,
+  // Post-cutoff year markers (bump as needed)
+  /\b(202[6-9]|203\d)\b/,
+];
+
+function extractTextContent(content: Message['content']): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((p): p is TextPart => p.type === 'text')
+    .map((p) => p.text)
+    .join(' ');
+}
+
+function shouldUseWebSearch(history: Message[]): { allow: boolean; query: string } {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role !== 'user') continue;
+    const query = extractTextContent(history[i].content).trim();
+    if (!query) return { allow: false, query: '' };
+    const allow = SEARCH_TRIGGERS.some((re) => re.test(query));
+    return { allow, query };
+  }
+  return { allow: false, query: '' };
+}
+
 /**
  * Stream the GPT reply using XHR (fetch doesn't expose response.body in RN/Hermes).
+ * Uses OpenAI's Responses API so we can expose the hosted `web_search_preview`
+ * tool — the model decides on its own when a query needs fresh info and calls
+ * the tool server-side. Tool-call events never produce spoken text; we only
+ * extract `response.output_text.delta` events into the sentence buffer.
+ *
  * XHR's onprogress fires as SSE chunks arrive — we parse each sentence and call
  * onSentence immediately so TTS can start before the full reply is done.
  * Returns the complete text once streaming is done.
@@ -215,10 +255,33 @@ export function streamChatResponse(
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const systemContent = buildSystemContent(memoryContext, systemSettings);
+    const { allow: useSearch, query: gateQuery } = shouldUseWebSearch(history);
+    console.log(
+      '[openai] web_search gate:',
+      useSearch ? 'ALLOW' : 'block',
+      '—',
+      gateQuery.slice(0, 80),
+    );
 
     let processedLength = 0; // how many chars of responseText we've already parsed
     let sentenceBuffer = '';  // tokens waiting for a sentence boundary
     let fullText = '';
+    let finished = false; // guard against onprogress firing after onload + double-reject
+    // Idle-token watchdog: if no tokens arrive for IDLE_TOKEN_MS after the
+    // stream starts, the connection is likely wedged (upstream hang, dropped
+    // TCP without RST). xhr.timeout fires on overall request time, not idle —
+    // without this, a silent stream can stall the voice loop past the outer
+    // watchdog. Bumped on every parsed event (including web_search_call.*) so a
+    // legitimate search doesn't get clipped during its ~3–10s server-side run.
+    const IDLE_TOKEN_MS = 15_000;
+    let lastTokenAt = Date.now();
+    let idleTimer: ReturnType<typeof setInterval> | null = null;
+    const clearIdle = () => {
+      if (idleTimer !== null) {
+        clearInterval(idleTimer);
+        idleTimer = null;
+      }
+    };
 
     // Flush complete sentences — only split on punctuation followed by a capital letter
     // to avoid cutting "Dr. Smith", "1.5 seconds", "U.S.", etc.
@@ -233,7 +296,11 @@ export function streamChatResponse(
       }
     };
 
-    // Parse raw SSE text (new chars only) into tokens.
+    // Parse raw SSE text (new chars only) into Responses API events.
+    // Only `response.output_text.delta` contributes spoken text; everything
+    // else (response.created, web_search_call.in_progress/completed,
+    // response.completed, reasoning deltas) is ignored for TTS but still
+    // resets the idle watchdog so we don't time out during search.
     const processChunk = (raw: string) => {
       for (const line of raw.split('\n')) {
         if (!line.startsWith('data: ')) continue;
@@ -241,7 +308,9 @@ export function streamChatResponse(
         if (payload === '[DONE]') continue;
         try {
           const chunk = JSON.parse(payload);
-          const token: string = chunk.choices?.[0]?.delta?.content ?? '';
+          lastTokenAt = Date.now();
+          if (chunk.type !== 'response.output_text.delta') continue;
+          const token: string = chunk.delta ?? '';
           if (!token) continue;
           fullText += token;
           sentenceBuffer += token;
@@ -251,20 +320,26 @@ export function streamChatResponse(
     };
 
     const xhr = new XMLHttpRequest();
-    xhr.timeout = 30_000;
-    xhr.ontimeout = () => reject(new Error('Chat stream timed out'));
-    xhr.open('POST', `${BASE}/chat/completions`);
+    xhr.timeout = 60_000;
+    xhr.ontimeout = () => {
+      if (finished) return;
+      finished = true;
+      clearIdle();
+      reject(new Error('Chat stream timed out'));
+    };
+    xhr.open('POST', `${BASE}/responses`);
     xhr.setRequestHeader('Authorization', `Bearer ${API_KEY}`);
     xhr.setRequestHeader('Content-Type', 'application/json');
 
     signal?.addEventListener('abort', () => {
+      if (finished) return;
+      finished = true;
+      clearIdle();
       xhr.abort();
       const err = new Error('Stream aborted');
       err.name = 'AbortError';
       reject(err);
     });
-
-    let finished = false; // guard against onprogress firing after onload
 
     xhr.onprogress = () => {
       if (finished) return;
@@ -274,7 +349,9 @@ export function streamChatResponse(
     };
 
     xhr.onload = () => {
+      if (finished) return;
       finished = true;
+      clearIdle();
       // Catch anything not yet processed
       const newText = xhr.responseText.slice(processedLength);
       processedLength = xhr.responseText.length; // prevent late onprogress re-processing
@@ -295,13 +372,36 @@ export function streamChatResponse(
       }
     };
 
-    xhr.onerror = () => reject(new Error('Network error during chat stream'));
+    xhr.onerror = () => {
+      if (finished) return;
+      finished = true;
+      clearIdle();
+      reject(new Error('Network error during chat stream'));
+    };
 
-    xhr.send(JSON.stringify({
+    idleTimer = setInterval(() => {
+      if (finished) { clearIdle(); return; }
+      if (Date.now() - lastTokenAt >= IDLE_TOKEN_MS) {
+        finished = true;
+        clearIdle();
+        try { xhr.abort(); } catch {}
+        console.warn('[openai] Chat stream idle for', IDLE_TOKEN_MS, 'ms — aborting');
+        reject(new Error('Chat stream idle timeout'));
+      }
+    }, 2_000);
+
+    const body: Record<string, any> = {
       model: 'gpt-5.4-mini',
       stream: true,
-      messages: [{ role: 'system', content: systemContent }, ...history],
-    }));
+      input: [{ role: 'system', content: systemContent }, ...history],
+    };
+    // Tool is attached only when the JS gate matched current-events / real-time
+    // / explicit-lookup patterns. Omitting it is stronger than asking the model
+    // to self-restrict — the model cannot invoke what it doesn't see.
+    if (useSearch) {
+      body.tools = [{ type: 'web_search_preview' }];
+    }
+    xhr.send(JSON.stringify(body));
   });
 }
 
@@ -349,8 +449,22 @@ export async function synthesizeSpeech(text: string, filename = 'tts-response.mp
 
   // Convert the binary response to base64 and write to a fixed temp file.
   // We always overwrite the same filename — no stale file accumulation.
-  const blob = await res.blob();
-  const base64 = await blobToBase64(blob);
+  // fetchWithTimeout covers headers only; body read can still hang on a
+  // flaky connection, so bound blob + base64 explicitly. Without these,
+  // a stalled body silently wedges the TTS drain indefinitely.
+  const TTS_BODY_MS = 10_000;
+  const blob = await Promise.race([
+    res.blob(),
+    new Promise<never>((_, rej) =>
+      setTimeout(() => rej(new Error('TTS body read timeout')), TTS_BODY_MS),
+    ),
+  ]);
+  const base64 = await Promise.race([
+    blobToBase64(blob),
+    new Promise<never>((_, rej) =>
+      setTimeout(() => rej(new Error('TTS base64 timeout')), TTS_BODY_MS),
+    ),
+  ]);
 
   // Cacheable phrases write to a stable hash-named file; streaming chunks use their per-turn filename.
   const isCacheable = filename === 'tts-response.mp3';

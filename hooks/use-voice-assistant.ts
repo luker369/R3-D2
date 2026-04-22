@@ -202,6 +202,17 @@ export function useVoiceAssistant() {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      // Safety net only — under normal navigation this hook lives for the
+      // app's lifetime. If something tears it down mid-turn (dev reload,
+      // future multi-screen nav), we still want the in-flight stream and
+      // native player released and the FGS dropped so we don't leak a
+      // background mic-permitted notification.
+      streamAbort.current?.abort();
+      if (currentSound.current) {
+        try { currentSound.current.remove(); } catch {}
+        currentSound.current = null;
+      }
+      if (isLooping.current) void stopForegroundService();
     };
   }, []);
 
@@ -213,16 +224,23 @@ export function useVoiceAssistant() {
     statusRef.current = status;
   }, [status]);
 
-  // State-transition trace. Logs every status change with the previous value
-  // and the current turn id so we can see whether state is moving in
-  // background or genuinely stuck. Purely additive — no behavior change.
-  const prevStatusForLog = useRef<AssistantStatus>(status);
-  useEffect(() => {
-    console.log(
-      `[VA STATE] turn=${turnNumber.current} ${prevStatusForLog.current} -> ${status} (looping=${isLooping.current}, isProcessing=${isProcessing.current})`,
-    );
-    prevStatusForLog.current = status;
-  }, [status]);
+  // Single chokepoint for status changes. Logs every transition synchronously
+  // at the call site (so reason/origin is visible) and defers to setStatus.
+  // Replaces the prior useEffect-based render-time transition log; one log
+  // per transition, with reason and turn id for correlation.
+  const setStatusSafe = useCallback(
+    (next: AssistantStatus, reason?: string) => {
+      const prev = statusRef.current;
+      if (prev === next) return;
+      console.log(
+        `[VA STATE] turn=${turnNumber.current} ${prev} -> ${next}` +
+          (reason ? ` (${reason})` : "") +
+          ` looping=${isLooping.current} isProcessing=${isProcessing.current}`,
+      );
+      setStatus(next);
+    },
+    [],
+  );
 
   const resumeLoopRef = useRef<() => Promise<void>>(async () => {});
   const appWasInBackgroundRef = useRef(false);
@@ -249,7 +267,7 @@ export function useVoiceAssistant() {
       await startForegroundService();
       const started = await startRecording();
       console.log("[VA] auto-start startRecording =>", started);
-      if (mounted.current) setStatus(started ? "listening" : "idle");
+      if (mounted.current) setStatusSafe(started ? "listening" : "idle", "auto-start");
       if (!started) {
         isLooping.current = false;
         setLooping(false);
@@ -323,10 +341,17 @@ export function useVoiceAssistant() {
       let lastPlaybackState: string | undefined;
       let lastStatus: any = null;
       let maxCurrentTime = 0;
+      // Idempotency guard. finish() may be reached from three concurrent
+      // paths: stallCheck timer, didJustFinish status event, or a parallel
+      // interrupt() call removing currentSound. Without this guard, a race
+      // can double-resolve the promise and double-remove the native player.
+      let finished = false;
       const finish = () => {
+        if (finished) return;
+        finished = true;
         clearInterval(stallCheck);
         sub.remove();
-        currentSound.current = null;
+        if (currentSound.current === player) currentSound.current = null;
         try {
           player.remove();
         } catch {}
@@ -413,7 +438,7 @@ export function useVoiceAssistant() {
       started = await startRecording();
       console.log("[VA] resumeLoop retry returned", started);
     }
-    if (mounted.current) setStatus(started ? "listening" : "idle");
+    if (mounted.current) setStatusSafe(started ? "listening" : "idle", "resumeLoop");
   }
 
   resumeLoopRef.current = resumeLoop;
@@ -481,20 +506,24 @@ export function useVoiceAssistant() {
     // and blocks every subsequent turn at the processRecording entry guard.
     try {
       if (mounted.current) addTurn("assistant", reply);
-      if (mounted.current) setStatus("speaking");
+      if (mounted.current) setStatusSafe("speaking", "speakAndFinish");
       const uri = await synthesizeSpeech(
         reply,
         "tts-response.mp3",
         voice ?? currentVoice(),
       );
       await playSound(uri);
-      await releasePlaybackAudio();
+      try {
+        await releasePlaybackAudio();
+      } catch (e: any) {
+        console.warn("[VA] releasePlaybackAudio threw (speakAndFinish):", e?.message);
+      }
       const delay = Math.min(800, 300 + reply.split(/\s+/).length * 20);
       await new Promise<void>((r) => setTimeout(r, delay));
       if (isLooping.current) {
         await resumeLoop();
       } else {
-        if (mounted.current) setStatus("idle");
+        if (mounted.current) setStatusSafe("idle", "speakAndFinish:end");
       }
     } finally {
       isProcessing.current = false;
@@ -806,12 +835,23 @@ export function useVoiceAssistant() {
                 .trim()
                 .slice(0, SUMMARY_MAX_CHARS);
             })
-            .catch(() => {
+            .catch((err) => {
+              // Re-compression failed; fall back to truncating the longer
+              // summary so we still have *some* bounded context, and surface
+              // the error so a broken backend doesn't silently degrade.
+              console.warn(
+                "[VA] compressHistory re-compress failed, truncating:",
+                err?.message,
+              );
               historySummary.current = next.slice(0, SUMMARY_MAX_CHARS);
             });
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        // First compress call failed; history.current was already trimmed
+        // above, so the conversation continues without the older context.
+        console.warn("[VA] compressHistory failed:", err?.message);
+      });
   }
 
   // ── Pipeline ───────────────────────────────────────────────────────────────
@@ -836,7 +876,7 @@ export function useVoiceAssistant() {
       if (isLooping.current) {
         await resumeLoop();
       } else {
-        if (mounted.current) setStatus("error");
+        if (mounted.current) setStatusSafe("error", "no-audio-uri");
       }
       return;
     }
@@ -847,18 +887,26 @@ export function useVoiceAssistant() {
     // manifests as a native player that reaches "ready/playing" but never
     // advances currentTime. Background playback is sacrificed until we add
     // MEDIA_PLAYBACK to the FGS service types.
-    await setAudioModeAsync({
-      allowsRecording: false,
-      playsInSilentMode: true,
-      interruptionMode: "mixWithOthers",
-      shouldRouteThroughEarpiece: false,
-      shouldPlayInBackground: false,
-    });
-    console.log(
-      "[VA] audio mode set: playback enabled, shouldPlayInBackground=false",
-    );
+    //
+    // Wrapped in try/catch: if setAudioModeAsync throws here we still want
+    // the turn to proceed (playback may degrade but text path still works);
+    // previously a throw aborted the whole turn silently.
+    try {
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        interruptionMode: "mixWithOthers",
+        shouldRouteThroughEarpiece: false,
+        shouldPlayInBackground: false,
+      });
+      console.log(
+        "[VA] audio mode set: playback enabled, shouldPlayInBackground=false",
+      );
+    } catch (e: any) {
+      console.warn("[VA] processRecording setAudioModeAsync threw:", e?.message);
+    }
 
-    setStatus("processing");
+    setStatusSafe("processing", "pipeline-start");
 
     try {
       const [userText, memoryContext, systemSettings, calendarContext] =
@@ -910,7 +958,7 @@ export function useVoiceAssistant() {
         if (isLooping.current) {
           await resumeLoop();
         } else {
-          if (mounted.current) setStatus("idle");
+          if (mounted.current) setStatusSafe("idle", "dropped-transcription");
         }
         return;
       }
@@ -1035,7 +1083,7 @@ export function useVoiceAssistant() {
         } catch {
           if (mounted.current) {
             setError("Something went off course. Check your connection.");
-            setStatus("error");
+            setStatusSafe("error", "saveEntry-failed");
           }
           isProcessing.current = false;
           return;
@@ -1239,7 +1287,7 @@ export function useVoiceAssistant() {
         }
       });
 
-      if (mounted.current) setStatus("speaking");
+      if (mounted.current) setStatusSafe("speaking", "stream-ready");
 
       // Drain the TTS queue as sentences arrive, without waiting for streaming to finish
       let playIdx = 0;
@@ -1271,7 +1319,11 @@ export function useVoiceAssistant() {
         }
       }
 
-      await releasePlaybackAudio();
+      try {
+        await releasePlaybackAudio();
+      } catch (e: any) {
+        console.warn("[VA] releasePlaybackAudio threw (post-drain):", e?.message);
+      }
 
       if (stale()) {
         isProcessing.current = false;
@@ -1282,7 +1334,11 @@ export function useVoiceAssistant() {
       if (mounted.current && assistantText) addTurn("assistant", assistantText);
 
       if (stale()) return;
-      extractAndSaveMemory(finalText, assistantText);
+      // Fire-and-forget memory write; surface failures so a broken backend
+      // doesn't degrade silently (was: no .catch — unhandled rejection).
+      void extractAndSaveMemory(finalText, assistantText).catch((err) =>
+        console.warn("[memory] extractAndSaveMemory failed:", err?.message),
+      );
       turnsSinceCompress.current += 1;
       if (turnsSinceCompress.current >= 6) {
         turnsSinceCompress.current = 0;
@@ -1296,7 +1352,7 @@ export function useVoiceAssistant() {
       if (isLooping.current) {
         await resumeLoop();
       } else {
-        if (mounted.current) setStatus("idle");
+        if (mounted.current) setStatusSafe("idle", "loop-end");
       }
       isProcessing.current = false;
       console.log("[VA] processRecording end, isProcessing reset");
@@ -1323,7 +1379,20 @@ export function useVoiceAssistant() {
         await speakAndFinish(recoveryLine);
       } catch {
         setError(recoveryLine);
-        setStatus("error");
+        setStatusSafe("error", "catch-fallback");
+      }
+    } finally {
+      // Safety net: stale() early returns inside the try block above don't
+      // explicitly reset isProcessing, and a future edit could miss one too.
+      // Without this, a leaked flag blocks every subsequent turn at the
+      // entry guard (`if (isProcessing.current) return`). Logged when it
+      // actually trips so we can spot the leaking path.
+      if (isProcessing.current) {
+        console.warn(
+          "[VA] processRecording finally: isProcessing was still true (turn=" +
+            turnId + "), safety reset",
+        );
+        isProcessing.current = false;
       }
     }
   }, [stopRecording, startRecording]);
@@ -1447,7 +1516,7 @@ export function useVoiceAssistant() {
         interrupt();
         if (isLooping.current) {
           resumeLoop();
-        } else if (mounted.current) setStatus("idle");
+        } else if (mounted.current) setStatusSafe("idle", "watchdog");
       }
     }, 2000);
     return () => clearInterval(interval);
@@ -1468,7 +1537,7 @@ export function useVoiceAssistant() {
       if (isLooping.current) {
         await resumeLoop();
       } else {
-        if (mounted.current) setStatus("idle");
+        if (mounted.current) setStatusSafe("idle", "press:interrupt");
       }
     } else if (looping) {
       console.log("[VA] handlePress branch: stop-loop");
@@ -1477,7 +1546,7 @@ export function useVoiceAssistant() {
       setLooping(false);
       interrupt();
       setError(null);
-      setStatus("idle");
+      setStatusSafe("idle", "press:stop");
       stopForegroundService();
     } else if (status === "idle" || status === "error") {
       console.log("[VA] handlePress branch: start-loop");
@@ -1488,14 +1557,14 @@ export function useVoiceAssistant() {
       await startForegroundService();
       const started = await startRecording();
       if (started) {
-        setStatus("listening");
+        setStatusSafe("listening", "press:start");
       } else {
         isLooping.current = false;
         setLooping(false);
         setError(
           "Microphone access denied. Enable it in Android Settings → Apps → R3-D2 → Permissions.",
         );
-        setStatus("error");
+        setStatusSafe("error", "press:mic-denied");
       }
     }
   }, [status, looping, startRecording]);
@@ -1532,11 +1601,11 @@ export function useVoiceAssistant() {
       if (needsStart) await startForegroundService();
       const started = await startRecording();
       if (!mounted.current) return;
-      if (started) setStatus("listening");
+      if (started) setStatusSafe("listening", "assist:listening");
       else {
         isLooping.current = false;
         setLooping(false);
-        setStatus("error");
+        setStatusSafe("error", "assist:fail");
       }
     })();
   };

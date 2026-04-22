@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -23,6 +23,14 @@ export default function HomeScreen() {
     sendText,
   } = useVoiceAssistant();
   const [pendingText, setPendingText] = useState('');
+  // Snapshot the transcript length when an image is picked so the pending
+  // bubble is rendered at that position and drifts upward as new turns
+  // arrive below it, instead of sitting pinned to the bottom.
+  const [pendingImageAnchor, setPendingImageAnchor] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!pendingImage) setPendingImageAnchor(null);
+  }, [pendingImage]);
 
   useFocusEffect(
     useCallback(() => {
@@ -33,22 +41,34 @@ export default function HomeScreen() {
   );
 
   async function pickImage() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.8,
       base64: false,
     });
     if (result.canceled || !result.assets[0]) return;
-    const uri = result.assets[0].uri;
+
+    const asset = result.assets[0];
+    const uri = asset.uri;
     const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-    setPendingImage({ uri, base64 });
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    console.log(
+      '[img] picked uri=', uri.slice(0, 80),
+      'mime=', mimeType,
+      'base64Bytes=', base64.length,
+    );
+    setPendingImageAnchor(transcript.length);
+    setPendingImage({ uri, base64, mimeType });
   }
 
   function doSend() {
     const t = pendingText.trim();
-    if (!t) return;
+    if (!t && !pendingImage) return;
     setPendingText('');
-    void sendText(t);
+    void sendText(pendingText);
   }
 
   return (
@@ -62,7 +82,12 @@ export default function HomeScreen() {
           style={styles.robot}
         />
       </View>
-      <TranscriptView entries={transcript} />
+      <TranscriptView
+        entries={transcript}
+        pendingImageUri={pendingImage?.uri ?? null}
+        pendingImageAnchor={pendingImageAnchor}
+        onRemovePending={() => setPendingImage(null)}
+      />
 
       {error && (
         <View style={styles.errorBanner}>
@@ -77,9 +102,6 @@ export default function HomeScreen() {
       <View style={styles.inputPill}>
         <TouchableOpacity style={styles.clipBtn} onPress={pickImage}>
           <Text style={styles.clipIcon}>📎</Text>
-          {pendingImage && (
-            <Image source={{ uri: pendingImage.uri }} style={styles.thumb} />
-          )}
         </TouchableOpacity>
 
         <TextInput
@@ -87,7 +109,7 @@ export default function HomeScreen() {
           value={pendingText}
           onChangeText={setPendingText}
           onSubmitEditing={doSend}
-          placeholder="Type to R2…"
+          placeholder="Type to R2..."
           placeholderTextColor="rgba(255,255,255,0.4)"
           returnKeyType="send"
           blurOnSubmit
@@ -95,7 +117,7 @@ export default function HomeScreen() {
         />
 
         <TouchableOpacity style={styles.sendBtn} onPress={doSend}>
-          <Text style={styles.sendIcon}>➤</Text>
+          <Text style={styles.sendIcon}>Send</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -141,13 +163,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
     paddingTop: 24,
-    paddingBottom: 16,
+    paddingBottom: 22,
   },
   inputPill: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 28,
     paddingHorizontal: 8,
     borderRadius: 28,
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -156,12 +178,14 @@ const styles = StyleSheet.create({
   },
   clipBtn: {
     width: 40,
-    height: 48,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },
   clipIcon: {
-    fontSize: 22,
+    fontSize: 21,
+    color: '#fff',
+    lineHeight: 28,
   },
   textInput: {
     flex: 1,
@@ -172,25 +196,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   sendBtn: {
-    width: 36,
+    minWidth: 52,
     height: 36,
+    paddingHorizontal: 12,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   sendIcon: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#fff',
-    marginLeft: 2,
-  },
-  thumb: {
-    position: 'absolute',
-    top: -46,
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#3B82F6',
+    fontWeight: '600',
   },
 });

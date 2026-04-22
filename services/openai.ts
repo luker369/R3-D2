@@ -97,6 +97,59 @@ export type Message = {
   content: string | (TextPart | ImagePart)[];
 };
 
+type ResponsesInputText = { type: 'input_text'; text: string };
+type ResponsesInputImage = {
+  type: 'input_image';
+  image_url: string;
+  detail: 'auto';
+};
+
+function hasImageContent(history: Message[]): boolean {
+  return history.some((message) =>
+    Array.isArray(message.content) &&
+    message.content.some((part) => part.type === 'image_url'),
+  );
+}
+
+function toResponsesContent(content: Message['content']): string | (ResponsesInputText | ResponsesInputImage)[] {
+  if (typeof content === 'string') return content;
+  return content.map((part) =>
+    part.type === 'text'
+      ? { type: 'input_text', text: part.text }
+      : {
+          type: 'input_image',
+          image_url: part.image_url.url,
+          detail: part.image_url.detail,
+        },
+  );
+}
+
+function toResponsesInput(history: Message[], systemContent: string) {
+  void systemContent;
+  return history.map((message) => ({
+    type: 'message' as const,
+    role: message.role,
+    content: toResponsesContent(message.content),
+  }));
+}
+
+function extractResponsesText(json: any): string {
+  const outputs = Array.isArray(json?.output) ? json.output : [];
+  const texts: string[] = [];
+
+  for (const item of outputs) {
+    if (item?.type !== 'message' || item?.role !== 'assistant') continue;
+    const content = Array.isArray(item.content) ? item.content : [];
+    for (const part of content) {
+      if (part?.type === 'output_text' && typeof part.text === 'string') {
+        texts.push(part.text);
+      }
+    }
+  }
+
+  return texts.join('').trim();
+}
+
 // ─── Whisper STT ──────────────────────────────────────────────────────────────
 
 /**
@@ -212,6 +265,48 @@ export type ChatOptions = { jsonMode?: boolean };
 
 export async function getChatResponse(history: Message[], memoryContext?: string, systemSettings?: Record<string, string>, model = 'gpt-5.4', opts: ChatOptions = {}): Promise<string> {
   const systemContent = buildSystemContent(memoryContext, systemSettings);
+  const useResponsesApi = hasImageContent(history) && !opts.jsonMode;
+
+  if (useResponsesApi) {
+    const body: Record<string, any> = {
+      model,
+      instructions: systemContent,
+      input: toResponsesInput(history, systemContent),
+    };
+
+    const imageParts = (body.input as any[])
+      .flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+      .filter((p: any) => p?.type === 'input_image').length;
+    const bodyBytes = JSON.stringify(body).length;
+    console.log(
+      '[img] POST', `${BASE}/responses`,
+      'model=', model,
+      'inputMsgs=', body.input.length,
+      'imageParts=', imageParts,
+      'bodyBytes=', bodyBytes,
+    );
+
+    const res = await withRetry(() => fetchWithTimeout(`${BASE}/responses`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, 20_000));
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '<unreadable>');
+      console.warn('[img] /responses error status=', res.status, 'body=', errBody.slice(0, 400));
+      throw safeErr('Chat error', res.status);
+    }
+
+    const json = await res.json();
+    const outText = extractResponsesText(json);
+    console.log(
+      '[img] /responses ok: model=', json.model ?? '<unknown>',
+      'outputTextLen=', outText.length,
+      'usage=', json.usage ? JSON.stringify(json.usage) : '<none>',
+    );
+    return outText.trim();
+  }
 
   const body: Record<string, any> = { model, messages: [{ role: 'system', content: systemContent }, ...history] };
   if (opts.jsonMode) body.response_format = { type: 'json_object' };
@@ -439,7 +534,8 @@ export function streamChatResponse(
     const body: Record<string, any> = {
       model: 'gpt-5.4-mini',
       stream: true,
-      input: [{ role: 'system', content: systemContent }, ...history],
+      instructions: systemContent,
+      input: toResponsesInput(history, systemContent),
     };
     // Tool is attached only when the JS gate matched current-events / real-time
     // / explicit-lookup patterns. Omitting it is stronger than asking the model
@@ -447,6 +543,16 @@ export function streamChatResponse(
     if (useSearch) {
       body.tools = [{ type: 'web_search_preview' }];
     }
+    const imageParts = (body.input as any[])
+      .flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+      .filter((p: any) => p?.type === 'input_image').length;
+    console.log(
+      '[img] POST stream', `${BASE}/responses`,
+      'model=', body.model,
+      'inputMsgs=', body.input.length,
+      'imageParts=', imageParts,
+      'bodyBytes=', JSON.stringify(body).length,
+    );
     xhr.send(JSON.stringify(body));
   });
 }

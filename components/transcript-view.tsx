@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { TranscriptEntry } from '@/hooks/use-voice-assistant';
 
 type Props = {
   entries: TranscriptEntry[];
+  pendingImageUri?: string | null;
+  pendingImageAnchor?: number | null;
+  onRemovePending?: () => void;
 };
 
-export function TranscriptView({ entries }: Props) {
+export function TranscriptView({ entries, pendingImageUri, pendingImageAnchor, onRemovePending }: Props) {
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -15,15 +18,36 @@ export function TranscriptView({ entries }: Props) {
       scrollRef.current?.scrollToEnd({ animated: true });
     }, 16);
     return () => clearTimeout(t);
-  }, [entries.length, entries[entries.length - 1]?.text]);
+  }, [entries.length, entries[entries.length - 1]?.text, pendingImageUri]);
 
-  if (entries.length === 0) {
+  if (entries.length === 0 && !pendingImageUri) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Tap the button and start talking.</Text>
       </View>
     );
   }
+
+  const renderEntry = (e: TranscriptEntry) => (
+    <View
+      key={e.id}
+      style={[styles.bubble, e.role === 'assistant' ? styles.assistantBubble : styles.userBubble]}
+    >
+      {e.imageUri && (
+        <Image source={{ uri: e.imageUri }} style={styles.image} resizeMode="cover" />
+      )}
+      {e.text ? <Text selectable style={styles.text}>{e.text}</Text> : null}
+    </View>
+  );
+
+  // Clamp the anchor so new turns arriving below push the pending bubble up
+  // with the flow, rather than leaving it pinned at the bottom.
+  const anchor =
+    pendingImageUri && typeof pendingImageAnchor === 'number'
+      ? Math.min(Math.max(pendingImageAnchor, 0), entries.length)
+      : entries.length;
+  const before = entries.slice(0, anchor);
+  const after = entries.slice(anchor);
 
   return (
     <ScrollView
@@ -32,17 +56,18 @@ export function TranscriptView({ entries }: Props) {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {entries.map((e) => (
-        <View
-          key={e.id}
-          style={[styles.bubble, e.role === 'assistant' ? styles.assistantBubble : styles.userBubble]}
-        >
-          {e.imageUri && (
-            <Image source={{ uri: e.imageUri }} style={styles.image} resizeMode="cover" />
+      {before.map(renderEntry)}
+      {pendingImageUri && (
+        <View style={[styles.bubble, styles.userBubble, styles.pendingBubble]}>
+          <Image source={{ uri: pendingImageUri }} style={[styles.image, styles.pendingImage]} resizeMode="cover" />
+          {onRemovePending && (
+            <TouchableOpacity style={styles.removePendingBtn} onPress={onRemovePending}>
+              <Text style={styles.removePendingText}>Remove</Text>
+            </TouchableOpacity>
           )}
-          {e.text ? <Text selectable style={styles.text}>{e.text}</Text> : null}
         </View>
-      ))}
+      )}
+      {after.map(renderEntry)}
     </ScrollView>
   );
 }
@@ -55,14 +80,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 48,
-    paddingBottom: 12,
+    paddingBottom: 28,
     justifyContent: 'flex-end',
     gap: 12,
   },
   emptyContainer: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 28,
     justifyContent: 'flex-end',
   },
   bubble: {
@@ -93,6 +118,24 @@ const styles = StyleSheet.create({
     width: 220,
     height: 160,
     borderRadius: 10,
+  },
+  pendingBubble: {
+    opacity: 0.6,
+  },
+  pendingImage: {
+    opacity: 0.85,
+  },
+  removePendingBtn: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  removePendingText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   emptyText: {
     color: 'rgba(255,255,255,0.35)',

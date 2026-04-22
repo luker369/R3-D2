@@ -88,6 +88,12 @@ export type TranscriptEntry = {
   imageUri?: string;
 };
 
+type PendingImage = {
+  uri: string;
+  base64: string;
+  mimeType: string;
+};
+
 export type AssistantStatus =
   | "idle"
   | "listening"
@@ -101,10 +107,7 @@ export function useVoiceAssistant() {
   const [status, setStatus] = useState<AssistantStatus>("idle");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [pendingImage, setPendingImage] = useState<{
-    uri: string;
-    base64: string;
-  } | null>(null);
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
 
   const history = useRef<Message[]>([]);
   const historySummary = useRef<string>("");
@@ -375,6 +378,7 @@ export function useVoiceAssistant() {
     role: "user" | "assistant",
     text: string,
     imageUri?: string,
+    historyContent?: Message["content"],
   ) {
     setTranscript((prev) => {
       const next = [
@@ -383,7 +387,31 @@ export function useVoiceAssistant() {
       ];
       return next.length > MAX_TRANSCRIPT ? next.slice(-MAX_TRANSCRIPT) : next;
     });
-    history.current.push({ role, content: text });
+    history.current.push({ role, content: historyContent ?? text });
+  }
+
+  function buildUserMessageContent(
+    text: string,
+    imageSnap: PendingImage | null,
+  ): Message["content"] {
+    const trimmed = text.trim();
+    if (!imageSnap) return trimmed;
+    const effectiveText = trimmed || "analyze this image";
+    console.log(
+      '[img] buildUserMessageContent: attaching image mime=', imageSnap.mimeType,
+      'base64Bytes=', imageSnap.base64.length,
+      'text=', JSON.stringify(effectiveText),
+    );
+    return [
+      {
+        type: "image_url" as const,
+        image_url: {
+          url: `data:${imageSnap.mimeType};base64,${imageSnap.base64}`,
+          detail: "auto" as const,
+        },
+      },
+      { type: "text" as const, text: effectiveText },
+    ];
   }
 
   const currentSound = useRef<any>(null);
@@ -822,19 +850,39 @@ export function useVoiceAssistant() {
   // skips memory/calendar injection for simplicity; typed chat is best-effort.
   async function sendText(raw: string): Promise<void> {
     const text = raw.trim();
-    if (!text) return;
-    if (isProcessing.current || isRecordingRef.current) {
-      console.log("[VA] sendText ignored: busy");
+    if (isProcessing.current) {
+      console.log("[VA] sendText ignored: processing");
       return;
     }
     const imageSnap = pendingImage;
+    if (!text && !imageSnap) return;
+    if (isRecordingRef.current) {
+      console.log("[VA] sendText interrupting active listening session");
+      isLooping.current = false;
+      setLooping(false);
+      try {
+        await stopRecording();
+      } catch (e: any) {
+        console.warn("[VA] sendText stopRecording threw:", e?.message);
+      }
+      if (mounted.current) setStatusSafe("idle", "sendText:stop-listening");
+      await stopForegroundService();
+    }
+    const userContent = buildUserMessageContent(text, imageSnap);
     if (imageSnap) setPendingImage(null);
-    addTurn("user", text, imageSnap?.uri);
+    addTurn("user", text, imageSnap?.uri, userContent);
     isProcessing.current = true;
     if (mounted.current) setStatusSafe("processing", "sendText");
+    const lastMsg = history.current[history.current.length - 1];
+    console.log(
+      '[img] sendText dispatch: hasImage=', !!imageSnap,
+      'historyLen=', history.current.length,
+      'lastContentIsArray=', Array.isArray(lastMsg?.content),
+    );
     try {
       const reply = await getChatResponse(history.current);
       if (!mounted.current) return;
+      console.log('[img] sendText reply bytes=', reply.length);
       await speakAndFinish(reply);
     } catch (e: any) {
       console.warn("[VA] sendText failed:", e?.message);
@@ -1088,28 +1136,8 @@ export function useVoiceAssistant() {
     return null;
   }
 
-  function buildHistorySlice(
-    imageSnap: { uri: string; base64: string } | null,
-    userText: string,
-  ): Message[] {
-    const recent = history.current.slice(-12).map((msg, i, arr) => {
-      if (imageSnap && i === arr.length - 1 && msg.role === "user") {
-        return {
-          ...msg,
-          content: [
-            {
-              type: "image_url" as const,
-              image_url: {
-                url: `data:image/jpeg;base64,${imageSnap.base64}`,
-                detail: "auto" as const,
-              },
-            },
-            { type: "text" as const, text: userText },
-          ],
-        };
-      }
-      return msg;
-    });
+  function buildHistorySlice(): Message[] {
+    const recent = history.current.slice(-12);
     if (!historySummary.current) return recent;
     return [
       {
@@ -1308,9 +1336,7 @@ export function useVoiceAssistant() {
         return;
       }
 
-      const imageSnap = pendingImage;
-      if (imageSnap) setPendingImage(null);
-      addTurn("user", finalText, imageSnap?.uri);
+      addTurn("user", finalText);
 
       // ── System settings ───────────────────────────────────────────────────
       const nameMatch = finalText.match(
@@ -1862,7 +1888,7 @@ export function useVoiceAssistant() {
         .filter(Boolean)
         .join("\n\n");
       const streamPromise = streamChatResponse(
-        buildHistorySlice(imageSnap, finalText),
+        buildHistorySlice(),
         fullContext,
         (sentence) => {
           if (timings.ttfs == null) timings.ttfs = Date.now() - turnStartedAt;

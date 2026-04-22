@@ -267,6 +267,16 @@ export function useVoiceAssistant() {
       await startForegroundService();
       const started = await startRecording();
       console.log("[VA] auto-start startRecording =>", started);
+      // Race-loss detection: if startRecording returned false but the
+      // recorder is actually running, another concurrent starter (usually
+      // ensureListening from an assist-gesture URL) already won the native
+      // race. Don't clobber their "listening" state with "idle".
+      if (!started && isRecordingRef.current) {
+        console.log(
+          "[VA] auto-start: startRecording=false but recorder is already running — race-loss, preserving state",
+        );
+        return;
+      }
       if (mounted.current) setStatusSafe(started ? "listening" : "idle", "auto-start");
       if (!started) {
         isLooping.current = false;
@@ -1601,12 +1611,23 @@ export function useVoiceAssistant() {
       if (needsStart) await startForegroundService();
       const started = await startRecording();
       if (!mounted.current) return;
-      if (started) setStatusSafe("listening", "assist:listening");
-      else {
-        isLooping.current = false;
-        setLooping(false);
-        setStatusSafe("error", "assist:fail");
+      if (started) {
+        setStatusSafe("listening", "assist:listening");
+        return;
       }
+      // Race-loss detection: if startRecording returned false but the
+      // recorder is actually running, a concurrent starter (usually the
+      // auto-start timer) already won the native race. Don't clobber their
+      // "listening" state with "error (assist:fail)".
+      if (isRecordingRef.current) {
+        console.log(
+          "[VA] ensureListening: startRecording=false but recorder is already running — race-loss, preserving state",
+        );
+        return;
+      }
+      isLooping.current = false;
+      setLooping(false);
+      setStatusSafe("error", "assist:fail");
     })();
   };
 

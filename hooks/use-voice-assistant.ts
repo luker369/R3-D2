@@ -281,12 +281,18 @@ export function useVoiceAssistant() {
   async function playSound(uri: string): Promise<void> {
     if (isLooping.current) {
       try {
+        // shouldPlayInBackground=false (temporarily, for diagnosis). With our
+        // FGS type limited to MICROPHONE, Android 14+ appears to deny an
+        // audio session when shouldPlayInBackground=true — the player reaches
+        // "ready/playing" but the playhead never advances and the state
+        // drops to "idle". Flipping this off restores foreground playback;
+        // the real fix is adding MEDIA_PLAYBACK to the FGS service types.
         await setAudioModeAsync({
           allowsRecording: false,
           playsInSilentMode: true,
           interruptionMode: "mixWithOthers",
           shouldRouteThroughEarpiece: false,
-          shouldPlayInBackground: true,
+          shouldPlayInBackground: false,
         });
       } catch (e: any) {
         console.warn("[VA] playSound setAudioModeAsync threw:", e?.message);
@@ -314,6 +320,9 @@ export function useVoiceAssistant() {
       const STALL_MS = 8_000;
       let lastProgressAt = Date.now();
       let updateCount = 0;
+      let lastPlaybackState: string | undefined;
+      let lastStatus: any = null;
+      let maxCurrentTime = 0;
       const finish = () => {
         clearInterval(stallCheck);
         sub.remove();
@@ -328,6 +337,10 @@ export function useVoiceAssistant() {
           console.warn(
             "[VA] playSound stalled (no progress for 8s), forcing finish updates=",
             updateCount,
+            "maxCurrentTime=",
+            maxCurrentTime,
+            "lastStatus=",
+            lastStatus,
           );
           finish();
         }
@@ -335,15 +348,49 @@ export function useVoiceAssistant() {
       const sub = player.addListener("playbackStatusUpdate", (status: any) => {
         lastProgressAt = Date.now();
         updateCount++;
-        if (updateCount <= 3) {
-          // Dump the first few raw status objects so we can see whether the
-          // player is loading, erroring, or producing actual progress data.
-          console.log("[VA] playSound status#", updateCount, status);
+        lastStatus = status;
+        if (typeof status?.currentTime === "number" && status.currentTime > maxCurrentTime) {
+          maxCurrentTime = status.currentTime;
+        }
+        // Log every playbackState transition so we can see whether the player
+        // ever leaves "buffering"/"paused" even if status frequency is low.
+        if (status?.playbackState !== lastPlaybackState) {
+          console.log(
+            "[VA] playSound state change #",
+            updateCount,
+            lastPlaybackState,
+            "->",
+            status?.playbackState,
+            "playing=",
+            status?.playing,
+            "tcs=",
+            status?.timeControlStatus,
+            "isLoaded=",
+            status?.isLoaded,
+            "currentTime=",
+            status?.currentTime,
+            "duration=",
+            status?.duration,
+          );
+          lastPlaybackState = status?.playbackState;
         }
         if (status.didJustFinish) finish();
       });
       try {
         player.play();
+        // Snapshot the player immediately after .play() — if this shows
+        // playing=false / tcs=paused, the call was rejected by the audio
+        // subsystem (not just waiting to buffer).
+        try {
+          console.log(
+            "[VA] playSound post-play snapshot playing=",
+            (player as any).playing,
+            "tcs=",
+            (player as any).timeControlStatus,
+            "isLoaded=",
+            (player as any).isLoaded,
+          );
+        } catch {}
       } catch (e: any) {
         console.warn("[VA] playSound player.play() threw:", e?.message);
         finish();
@@ -794,20 +841,21 @@ export function useVoiceAssistant() {
       return;
     }
 
-    // shouldPlayInBackground MUST be set true here — this call runs while
-    // still foreground, before the user can background the app. If we leave
-    // it false, the backgrounded player honors that (foreground-baked) value
-    // and silently buffers forever. setAudioModeAsync called from background
-    // does not reliably take effect on Android.
+    // shouldPlayInBackground=false (temporarily, for diagnosis). See
+    // matching comment in playSound above — FGS type MICROPHONE is
+    // incompatible with shouldPlayInBackground=true on Android 14+, which
+    // manifests as a native player that reaches "ready/playing" but never
+    // advances currentTime. Background playback is sacrificed until we add
+    // MEDIA_PLAYBACK to the FGS service types.
     await setAudioModeAsync({
       allowsRecording: false,
       playsInSilentMode: true,
       interruptionMode: "mixWithOthers",
       shouldRouteThroughEarpiece: false,
-      shouldPlayInBackground: true,
+      shouldPlayInBackground: false,
     });
     console.log(
-      "[VA] audio mode set: playback enabled, shouldPlayInBackground=true",
+      "[VA] audio mode set: playback enabled, shouldPlayInBackground=false",
     );
 
     setStatus("processing");

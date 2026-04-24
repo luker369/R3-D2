@@ -13,6 +13,8 @@
  *   Account 2/3 (optional): add _2 / _3 suffix to each.
  */
 
+console.log("[gmail-debug] URL:", process.env.EXPO_PUBLIC_APPS_SCRIPT_URL);
+
 type Account = {
   label: string;
   url: string;

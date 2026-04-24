@@ -201,8 +201,11 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
     ? segments.reduce((sum, s) => sum + s.no_speech_prob, 0) / segments.length
     : 0;
   if (avgNoSpeech > 0.35) return '';
-  // Also reject if any single segment is highly confident there was no speech
-  if (segments.some(s => s.no_speech_prob > 0.8)) return '';
+  // Per-segment safety net for the rare case where avg passes but one
+  // segment is implausibly silent. Bumped 0.8 → 0.95 so that a short
+  // utterance + trailing silence (e.g. a "yes" followed by the 900ms
+  // silence-trigger window) doesn't get killed by its own silence tail.
+  if (segments.some(s => s.no_speech_prob > 0.95)) return '';
 
   return deduplicateTranscript((json.text as string).trim());
 }

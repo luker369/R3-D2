@@ -16,11 +16,12 @@ export const HALLUCINATIONS = new Set([
   "thanks",
   "you",
   "the",
-  "okay",
-  "ok",
-  "yeah",
-  "yes",
-  "no",
+  // Short affirmations ("yes", "no", "okay", "ok", "yeah") are intentionally
+  // NOT listed here. Legitimate standalone affirmations from the user outnumber
+  // silence-hallucinations of these words, and the upstream no_speech_prob
+  // checks in services/openai.ts::transcribeAudio already drop silent clips
+  // before they reach this filter. Long-form Youtube cruft is still blocked
+  // via HALLUCINATION_SUBSTRINGS below and the repetition detector.
   "hmm",
   "um",
   "uh",

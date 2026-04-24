@@ -85,11 +85,13 @@ import { useVoiceRecorder } from "./use-voice-recorder";
 // ─── Silence detection config ─────────────────────────────────────────────────
 
 const SILENCE_DURATION_MS = 900;
-const SPEECH_CONFIRM_SAMPLES = 3; // 300ms of sustained sound before arming
+const SPEECH_CONFIRM_SAMPLES = 2; // 200ms of sustained sound before arming
 const MIN_SPEECH_DURATION_MS = 300; // must speak for at least 0.3s total
 const POST_RESTART_GRACE_MS = 400; // ignore mic briefly after recorder restarts (prevents TTS bleed from triggering)
+const PLAYBACK_ECHO_GUARD_MS = 1200; // ignore mic briefly after speaker playback ends so R2 doesn't hear itself
 const SPEECH_MARGIN_DB = 10; // dB above ambient floor to count as speech
 const AMBIENT_ALPHA = 0.05; // EMA smoothing: lower = slower adaptation
+const SHORT_SENTENCE_FLUSH_MS = 350; // don't make tiny first sentences wait forever for another chunk
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,6 +135,7 @@ export function useVoiceAssistant() {
   const streamAbort = useRef<AbortController | null>(null);
   const processingGen = useRef(0);
   const turnsSinceCompress = useRef(0);
+  const lastPlaybackEndedAt = useRef(0);
 
   // Two-turn calendar confirmation: on a calendar utterance we parse, stash
   // the proposed event here, and speak a summary + "Should I create it?". The
@@ -198,6 +201,20 @@ export function useVoiceAssistant() {
   const bumpProgress = () => {
     lastProgressAt.current = Date.now();
   };
+
+  const resetSpeechDetection = useCallback((reason: string) => {
+    hasSpoken.current = false;
+    speechSamples.current = 0;
+    speechStart.current = null;
+    silenceStart.current = null;
+    ambientDb.current = -42;
+    console.log(`[VA] reset detection state reason=${reason} ambient=-42`);
+  }, []);
+
+  const markPlaybackEnded = useCallback((reason: string) => {
+    lastPlaybackEndedAt.current = Date.now();
+    resetSpeechDetection(`playback-ended:${reason}`);
+  }, [resetSpeechDetection]);
 
   useEffect(() => {
     mounted.current = true;
@@ -562,6 +579,7 @@ export function useVoiceAssistant() {
         settled = true;
         cleanupTimers();
         teardownPlayer();
+        markPlaybackEnded(source);
         console.log(
           "[BG-AUDIO] playSound end source=",
           source,
@@ -580,6 +598,7 @@ export function useVoiceAssistant() {
         settled = true;
         cleanupTimers();
         teardownPlayer();
+        markPlaybackEnded(`no-audio:${reason}`);
         console.warn(
           "[BG-AUDIO] playSound NO_AUDIO reason=",
           reason,
@@ -749,12 +768,6 @@ export function useVoiceAssistant() {
       mounted.current,
     );
     if (!isLooping.current || !mounted.current) return;
-    // [mic-warmup] 250ms grace before restarting the recorder so the audio
-    // session has fully switched modes after the playback teardown. Without
-    // this, the first syllable of a fast follow-up gets clipped and the turn
-    // drops as too-short. Post-turn-only — manual press-to-talk skips this
-    // because it doesn't go through resumeLoop.
-    await new Promise<void>((r) => setTimeout(r, 250));
     let ok = await ensureListeningLockedRef.current("resumeLoop");
     if (!ok && mounted.current) {
       await new Promise<void>((r) => setTimeout(r, 250));
@@ -835,6 +848,7 @@ export function useVoiceAssistant() {
       try { await currentSound.current.unloadAsync?.(); }
       catch (e: any) { console.warn("[VA] hardAudioReset unloadAsync threw:", e?.message); }
       currentSound.current = null;
+      markPlaybackEnded(`hard-reset:${reason}`);
     }
     // Drop the playback session even without a current player. Android can keep
     // a stale audio state across turns, and the next player then transitions
@@ -2018,6 +2032,27 @@ export function useVoiceAssistant() {
       const MAX_TTS_INFLIGHT = 3;
       let ttsInflight = 0;
       const ttsWaiters: Array<() => void> = [];
+      let pendingSentenceFlushTimer: ReturnType<typeof setTimeout> | null = null;
+      const clearPendingSentenceFlush = () => {
+        if (pendingSentenceFlushTimer) {
+          clearTimeout(pendingSentenceFlushTimer);
+          pendingSentenceFlushTimer = null;
+        }
+      };
+      const schedulePendingSentenceFlush = () => {
+        clearPendingSentenceFlush();
+        pendingSentenceFlushTimer = setTimeout(() => {
+          pendingSentenceFlushTimer = null;
+          if (stale()) return;
+          const trimmed = pendingSentence.trim();
+          if (!trimmed) return;
+          console.log(
+            `[TTS turn=${turnId}] short-sentence flush words=${trimmed.split(/\s+/).length}`,
+          );
+          pendingSentence = "";
+          pushTts(trimmed);
+        }, SHORT_SENTENCE_FLUSH_MS);
+      };
       const acquireTtsSlot = async () => {
         if (ttsInflight < MAX_TTS_INFLIGHT) {
           ttsInflight++;
@@ -2089,8 +2124,10 @@ export function useVoiceAssistant() {
             ttsQueue.length === 0 ? MIN_TTS_WORDS_FIRST : MIN_TTS_WORDS_REST;
           if (words.length < threshold) {
             pendingSentence = combined;
+            schedulePendingSentenceFlush();
             return;
           }
+          clearPendingSentenceFlush();
           pendingSentence = "";
           pushTts(combined);
         },
@@ -2099,6 +2136,7 @@ export function useVoiceAssistant() {
       )
         .then((text) => {
           streamDone = true;
+          clearPendingSentenceFlush();
           if (pendingSentence) {
             pushTts(pendingSentence);
             pendingSentence = "";
@@ -2121,6 +2159,7 @@ export function useVoiceAssistant() {
         })
         .catch((err) => {
           streamDone = true;
+          clearPendingSentenceFlush();
           throw err;
         });
 
@@ -2360,6 +2399,8 @@ export function useVoiceAssistant() {
       if (statusRef.current !== "listening") return;
       if (Date.now() - recordingStartedAt.current < POST_RESTART_GRACE_MS)
         return;
+      if (Date.now() - lastPlaybackEndedAt.current < PLAYBACK_ECHO_GUARD_MS)
+        return;
 
       const db = frame.dbfs;
       const threshold = ambientDb.current + SPEECH_MARGIN_DB;
@@ -2412,16 +2453,11 @@ export function useVoiceAssistant() {
 
   useEffect(() => {
     if (!isRecording) {
-      hasSpoken.current = false;
-      speechSamples.current = 0;
-      speechStart.current = null;
-      silenceStart.current = null;
-      ambientDb.current = -42;
-      console.log("[VA] reset detection state, ambient=-42");
+      resetSpeechDetection("recording-stopped");
     } else {
       recordingStartedAt.current = Date.now();
     }
-  }, [isRecording]);
+  }, [isRecording, resetSpeechDetection]);
 
   // Progress-based watchdog: trip only if no activity (stream token, TTS fetch done,
   // playback started/finished) within WATCHDOG_MS. Long replies are safe as long as

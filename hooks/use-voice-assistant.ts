@@ -24,6 +24,7 @@ import {
     fetchRecentEmails,
     fetchUnreadEmails,
     getAccountLabels,
+    GmailReachError,
     replyToThread,
     sendEmail,
     type GmailMessage,
@@ -1647,9 +1648,22 @@ export function useVoiceAssistant() {
       if (isGmailReadCommand(finalText)) {
         const unread = isUnreadVariant(finalText);
         const scopedLabel = detectGmailAccountLabel(finalText);
-        const emails = unread
-          ? await fetchUnreadEmails(5, scopedLabel)
-          : await fetchRecentEmails(5, scopedLabel);
+        let emails;
+        try {
+          emails = unread
+            ? await fetchUnreadEmails(5, scopedLabel)
+            : await fetchRecentEmails(5, scopedLabel);
+        } catch (err: any) {
+          if (stale()) { isProcessing.current = false; return; }
+          if (err instanceof GmailReachError) {
+            // Distinct from "no messages found" — Gmail couldn't be reached
+            // (no creds, transport, script error, or HTML body). Surface the
+            // reach failure to the user instead of mis-reporting empty inbox.
+            console.warn('[VA] gmail reach failed:', err.reason, err.message);
+            return await speakAndFinish("Couldn't reach Gmail. Try again in a moment.");
+          }
+          throw err;
+        }
         if (stale()) { isProcessing.current = false; return; }
         if (emails.length === 0) {
           const where = scopedLabel ? ` in ${scopedLabel}` : "";

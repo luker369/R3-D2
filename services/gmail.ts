@@ -29,6 +29,28 @@ export type GmailMessage = {
   account?: string;
 };
 
+/**
+ * Thrown when a Gmail read could not actually reach the script (no accounts in
+ * bundle, transport failed after retry, script returned an error, or response
+ * shape was wrong). Distinct from a successful empty inbox — callers should
+ * surface "couldn't reach Gmail" instead of "no messages found".
+ *
+ * `reason` discriminates the failure:
+ *   - 'no_accounts'  : env vars missing from bundle
+ *   - 'transport'    : network/timeout/abort after retry
+ *   - 'script_error' : Apps Script returned `{error: ...}` (often: bad secret)
+ *   - 'bad_response' : non-JSON-array body (often: HTML login page)
+ */
+export class GmailReachError extends Error {
+  constructor(
+    public reason: 'no_accounts' | 'transport' | 'script_error' | 'bad_response',
+    detail?: string,
+  ) {
+    super(`gmail unreachable (${reason})${detail ? `: ${detail}` : ''}`);
+    this.name = 'GmailReachError';
+  }
+}
+
 // [gmail-debug] One-time module-load probe. Logs only presence + length, never
 // the actual values, so secrets stay out of console history. Remove these
 // console.logs once Gmail is verified working end-to-end.
@@ -135,21 +157,39 @@ async function call(
   const accounts = loadAccounts();
   if (accounts.length === 0) {
     console.warn('[gmail] no accounts configured — set EXPO_PUBLIC_APPS_SCRIPT_URL + SECRET');
-    return [];
+    throw new GmailReachError('no_accounts', 'env vars missing from bundle');
   }
 
   const targets = labelFilter
     ? accounts.filter(a => a.label.toLowerCase() === labelFilter.toLowerCase())
     : accounts;
   if (targets.length === 0) {
+    // Label mismatch is a user-spoke-wrong-label case, not a reach failure —
+    // keep returning [] so the caller falls through to "no messages in <label>".
     console.warn(`[gmail] no account matching label "${labelFilter}"`);
     return [];
   }
 
-  const results = await Promise.all(targets.map(a => fetchOne(a, action, extra)));
-  const merged = results.flat();
-  merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // allSettled so one bad account in a multi-account fan-out doesn't poison
+  // the read. If at least one target succeeded, return the merged successes
+  // (best-effort). Only when every target failed do we throw GmailReachError,
+  // so the caller can speak "couldn't reach" instead of "no messages found".
+  const results = await Promise.allSettled(targets.map(a => fetchOne(a, action, extra)));
+  const merged: GmailMessage[] = [];
+  let firstReachError: GmailReachError | null = null;
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      merged.push(...r.value);
+    } else {
+      const err = r.reason instanceof GmailReachError
+        ? r.reason
+        : new GmailReachError('transport', String(r.reason?.message ?? r.reason));
+      firstReachError = firstReachError ?? err;
+    }
+  }
+  if (merged.length === 0 && firstReachError) throw firstReachError;
 
+  merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const count = Math.max(1, Number(extra.count) || 5);
   return merged.slice(0, count);
 }
@@ -263,24 +303,39 @@ async function fetchOne(
 
   // Apps Script 302-redirects once to script.googleusercontent.com; mobile networks
   // sometimes drop that. One retry with backoff recovers silently.
+  let lastTransportErr: any = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res  = await fetchWithTimeout(url, 12_000);
       const json = await res.json();
       if (json && json.error) {
+        // Script ran but returned an error envelope (commonly: bad secret).
+        // Deterministic — don't retry, propagate as a reach failure so the
+        // caller doesn't mis-report it as "no messages".
         console.warn(`[gmail] error from ${acc.label}:`, json.error);
-        return [];
+        throw new GmailReachError('script_error', `${acc.label}: ${json.error}`);
       }
-      if (!Array.isArray(json)) return [];
+      if (!Array.isArray(json)) {
+        // Apps Script returned HTML (login page, error page) instead of JSON.
+        // Also deterministic — propagate, don't silently flatten to [].
+        console.warn(`[gmail] non-array response from ${acc.label}`);
+        throw new GmailReachError('bad_response', `${acc.label}: response was not a JSON array`);
+      }
       return (json as GmailMessage[]).map(m => ({ ...m, account: acc.label }));
-    } catch (e) {
+    } catch (e: any) {
+      // GmailReachError from script_error / bad_response is deterministic —
+      // re-throw without retrying. Only network/transport errors get retried.
+      if (e instanceof GmailReachError && e.reason !== 'transport') throw e;
+      lastTransportErr = e;
       if (attempt === 0) {
         await new Promise(r => setTimeout(r, 400 + Math.floor(Math.random() * 300)));
         continue;
       }
-      console.warn(`[gmail] ${acc.label} fetch failed after retry:`, e);
-      return [];
     }
   }
-  return [];
+  console.warn(`[gmail] ${acc.label} fetch failed after retry:`, lastTransportErr);
+  throw new GmailReachError(
+    'transport',
+    `${acc.label}: ${lastTransportErr?.message ?? lastTransportErr}`,
+  );
 }

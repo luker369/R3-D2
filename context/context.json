@@ -2,9 +2,10 @@
   "always": {
     "identity": {
       "name": "Luke Sterling",
-      "role": "solo developer building full-stack apps and product ideas",
+      "role": "Product Engineer | Full-Stack & AI-Augmented Development",
       "location": "Chicago, IL, USA",
-      "primary_focus": "building and improving full-stack apps for real-world use"
+      "primary_focus": "designing, building, and shipping full-stack applications from concept to deployment with AI-augmented workflows",
+      "summary": "Product Engineer with end-to-end experience building and shipping production applications—from concept to deployment. Combines strong front-end expertise with full-stack development and AI-driven workflows to rapidly design, build, and iterate on real-world products."
     },
     "preferences": {
       "response_style": "direct, structured, avoids unnecessary fluff, prioritizes clarity and actionable insight",
@@ -19,15 +20,15 @@
         "Supabase",
         "AI-assisted development (Claude, ChatGPT, Cursor)"
       ],
-      "coding_style": "builds iteratively, relies heavily on AI for implementation, focuses on working systems over perfect architecture",
+      "coding_style": "builds and ships real-world products end-to-end, leverages AI to accelerate development, prioritizes working systems and iteration over theoretical perfection",
       "communication_style": "direct, concise, prefers clear explanations over long-winded responses, values practical guidance",
-      "learning_style": "learns by doing and iterating, prefers real examples over theory, asks targeted questions during development",
-      "decision_style": "explores multiple options, compares tools and approaches, prefers simple and effective solutions over complex ones"
+      "learning_style": "learns by building and shipping real applications, prefers real-world examples over theory, iterates quickly",
+      "decision_style": "evaluates tools and architectures pragmatically, prefers simple and scalable solutions over over-engineering"
     },
     "core_constraints": {
       "complexity_tolerance": "prefers simple, practical solutions over complex or over-engineered systems",
       "financial": "moderate budget; prefers cost-efficient tools and minimal ongoing expenses",
-      "technical": "strong in React and frontend, still building experience with mobile and backend systems"
+      "technical": "strong in frontend and product architecture, experienced in full-stack systems, continuing to deepen backend and mobile expertise"
     }
   },
 
@@ -38,46 +39,89 @@
       "example": "The R2-D3 workspace is the voice assistant only. Vintage/lot-tracker and PhotoRoom-style integrations live in a separate app/repo—not inside R2-D3 unless those files are open."
     },
 
+    "professional_experience": [
+      {
+        "title": "Independent Product Engineer",
+        "type": "Self-Employed / Mentored",
+        "years": "2020 – Present",
+        "highlights": [
+          "Built and shipped a full-stack React Native application for resale inventory management",
+          "Designed system architecture across mobile app, web dashboard, and backend",
+          "Leveraged AI tools to accelerate development and automate classification workflows",
+          "Developed responsive web apps using React and Next.js",
+          "Integrated APIs and built dynamic UI features and data flows"
+        ]
+      }
+    ],
+
     "projects": [
       {
         "name": "Ruby Vintage App",
         "aliases": ["ruby vintage", "lot tracker", "vintage app", "resale app"],
-        "description": "App that speeds up resale inventory intake by letting users photograph items and automatically tag and organize them into lots",
+        "description": "Mobile-first resale inventory intake system that allows users to photograph items and automatically tag, classify, and organize them into lots using AI",
         "tech_stack": "React Native (Expo), TypeScript, NativeWind, Supabase, OpenAI API",
         "status": "MVP built and in active refinement",
-        "current_focus": "MVP built and functional, currently refining and debugging core features",
+        "current_focus": "refining AI-assisted classification workflows and improving core intake speed and reliability",
+        "notable_features": [
+          "AI-assisted item classification",
+          "mobile-first capture workflow",
+          "inventory dashboard",
+          "scalable architecture for automation"
+        ],
         "codebase_hint": "Separate repo/folder (e.g. lot_tracker_app on disk)—not the R2-D3 assistant project"
       },
       {
         "name": "Pallet Scanner App",
         "aliases": ["pallet scanner", "pallet app", "bulk inventory scanner"],
-        "description": "Mobile app that scans and analyzes bulk inventory pallets to quickly identify, categorize, and assess items using AI",
+        "description": "Mobile app that scans and analyzes bulk inventory pallets to identify, categorize, and assess items using AI",
         "tech_stack": "React Native (Expo), TypeScript, Supabase, OpenAI API, camera/vision processing",
-        "status": "early development, concept validated with direction toward implementation",
-        "current_focus": "figuring out efficient multi-item scanning and real-time AI analysis workflow",
+        "status": "early development",
+        "current_focus": "multi-item scanning and real-time AI analysis pipeline",
         "codebase_hint": "Separate repo from R2-D3"
       },
       {
         "name": "R2-D2 Personal Assistant",
         "aliases": ["r2", "r2-r3", "r3-d2", "assistant", "voice assistant"],
-        "description": "Personal AI assistant app that integrates with calendar, memory, email, web browsing, and user context to help manage tasks, provide insights, and support daily decision-making",
+        "description": "Personal AI assistant integrating calendar, memory, email, and context to support daily decision-making and task management",
         "tech_stack": "React Native (Expo), TypeScript, Supabase, OpenAI API, Google APIs, expo-secure-store",
         "status": "MVP working and actively being hardened",
-        "current_focus": "stabilizing standalone APK behavior, improving context/memory system, and expanding assistant capabilities",
+        "current_focus": "stability, memory system improvements, and expanding assistant capabilities",
         "codebase_hint": "This workspace: R2-D3"
       }
+    ],
+
+    "skills": {
+      "frontend": ["React", "Next.js", "HTML", "CSS", "Tailwind"],
+      "mobile": ["React Native (Expo)"],
+      "backend": ["Node.js", "Express", "Supabase", "Firebase"],
+      "core": ["JavaScript", "REST APIs", "Git", "GitHub"],
+      "advanced": ["AI-Augmented Development", "Product Architecture"]
+    },
+
+    "education": [
+      {
+        "program": "Front-End Web Development Bootcamp",
+        "institution": "Nucamp Coding Bootcamp",
+        "years": "2021 – 2022",
+        "focus": ["HTML", "CSS", "JavaScript", "React", "Node.js"]
+      }
+    ],
+
+    "languages": [
+      { "language": "English", "proficiency": "Native" },
+      { "language": "Spanish", "proficiency": "Conversational" }
     ],
 
     "goals": {
       "short_term": [
         "stabilize and improve Lot Tracker app",
         "advance R2 assistant functionality",
-        "test and validate Pallet Scanner concept"
+        "validate and build Pallet Scanner workflows"
       ],
       "long_term": [
         "build profitable software products",
         "create scalable income streams through apps",
-        "develop efficient, sustainable work systems"
+        "develop efficient, sustainable product systems"
       ]
     },
 
@@ -135,17 +179,17 @@
 
     "current_context": {
       "active_tasks": [
-        "setting up Cursor and integrating it into development workflow",
-        "building and refining context.json for R2 assistant",
-        "debugging and improving R2 calendar integration",
-        "stabilizing Lot Tracker app core flows"
+        "integrating Cursor into development workflow",
+        "refining R2 assistant context and memory system",
+        "debugging R2 calendar integration",
+        "stabilizing Lot Tracker app flows"
       ],
-      "recent_progress": "Installed Cursor, began transitioning workflow from VS Code, structured context.json for projects and assistant, progressed on R2 calendar read functionality",
+      "recent_progress": "structured context system, progressed on R2 functionality, continued refining mobile app workflows",
       "current_problems": [
-        "confusion around optimal workflow between Cursor, Claude, and ChatGPT",
-        "R2 calendar write functionality not working yet",
-        "OAuth tokens not being fully utilized in current implementation",
-        "uncertainty around how to best structure assistant context and memory system"
+        "tooling workflow confusion (Cursor vs Claude vs ChatGPT)",
+        "R2 calendar write functionality",
+        "OAuth token usage gaps",
+        "context/memory architecture decisions"
       ]
     },
 

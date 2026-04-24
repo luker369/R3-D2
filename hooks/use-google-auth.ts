@@ -4,26 +4,41 @@
  * Manual Google OAuth flow (PKCE + auth code). Android OAuth clients do not
  * permit implicit flow — we must exchange a code.
  *
- * Instead of relying on WebBrowser.openAuthSessionAsync's redirect-detection
- * (which is unreliable with custom URI schemes on newer Chrome), we:
- *   1. openBrowserAsync to start the flow
- *   2. Listen for the redirect via Linking.addEventListener
- *   3. Close the browser when the URL arrives
+ * We use a belt-and-suspenders approach on Android:
+ *   1. Start an auth session with expo-web-browser
+ *   2. Also listen for the redirect via Linking.addEventListener
+ *   3. Whichever resolves first wins
  *   4. Exchange the code for tokens
  *
  * The redirect URI uses the reversed Android client ID + :/oauth2redirect,
- * which matches the intent filter in app.json.
+ * which is generated into the Android intent filter by app.config.js.
  */
 
 import { useCallback } from 'react';
 import { Linking } from 'react-native';
+import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
 import { saveTokens } from '@/services/google-auth';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
+function getExtraValue(key: string): string {
+  const expoExtra =
+    (Constants.expoConfig?.extra as Record<string, unknown> | undefined) ??
+    ((Constants as typeof Constants & {
+      manifest?: { extra?: Record<string, unknown> };
+      manifest2?: { extra?: Record<string, unknown> };
+    }).manifest2?.extra as Record<string, unknown> | undefined) ??
+    ((Constants as typeof Constants & {
+      manifest?: { extra?: Record<string, unknown> };
+    }).manifest?.extra as Record<string, unknown> | undefined);
+
+  const value = expoExtra?.[key];
+  return typeof value === 'string' ? value : '';
+}
+
+const ANDROID_CLIENT_ID = getExtraValue('googleAndroidClientId');
 
 const SCOPES = [
   'openid',
@@ -65,16 +80,29 @@ async function deriveChallenge(verifier: string): Promise<string> {
 function waitForRedirect(redirectPrefix: string, timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
     let sub: { remove: () => void } | null = null;
+    let settled = false;
+    const finish = (url: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      sub?.remove();
+      resolve(url);
+    };
     const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       sub?.remove();
       reject(new Error('timeout'));
     }, timeoutMs);
+
+    Linking.getInitialURL()
+      .then((url) => {
+        if (url?.startsWith(redirectPrefix)) finish(url);
+      })
+      .catch(() => {});
+
     sub = Linking.addEventListener('url', (event) => {
-      if (event.url.startsWith(redirectPrefix)) {
-        clearTimeout(timer);
-        sub?.remove();
-        resolve(event.url);
-      }
+      if (event.url.startsWith(redirectPrefix)) finish(event.url);
     });
   });
 }
@@ -86,7 +114,7 @@ export function useGoogleSignIn(opts: Options | (() => void)) {
   return useCallback(async () => {
     try {
       if (!ANDROID_CLIENT_ID) {
-        onError?.('client id missing from env');
+        onError?.('google android client id missing from app config');
         return;
       }
 
@@ -107,22 +135,37 @@ export function useGoogleSignIn(opts: Options | (() => void)) {
         '&access_type=offline' +
         '&prompt=consent';
 
-      const redirectPromise = waitForRedirect(
-        `${reverseClientId(ANDROID_CLIENT_ID)}:`,
-        5 * 60 * 1000,
-      );
+      const redirectPrefix = `${reverseClientId(ANDROID_CLIENT_ID)}:`;
+      const redirectPromise = waitForRedirect(redirectPrefix, 5 * 60 * 1000).then((url) => ({
+        type: 'success' as const,
+        url,
+      }));
 
-      // Open in the system browser (not Chrome Custom Tabs) so the redirect
-      // back to our custom URI scheme fires through Android's intent system.
-      await Linking.openURL(authUrl);
+      const sessionPromise = WebBrowser.openAuthSessionAsync(authUrl, redirectUri)
+        .then((result) => {
+          if (result.type === 'success' && typeof result.url === 'string') {
+            return { type: 'success' as const, url: result.url };
+          }
+          return { type: result.type };
+        })
+        .catch(() => ({ type: 'error' as const }));
 
-      let redirectUrl: string;
-      try {
-        redirectUrl = await redirectPromise;
-      } catch {
-        onError?.('sign-in timed out or was cancelled');
+      const sessionResult = await Promise.race([redirectPromise, sessionPromise]);
+
+      if (sessionResult.type !== 'success') {
+        onError?.(
+          sessionResult.type === 'dismiss' || sessionResult.type === 'cancel'
+            ? 'sign-in was cancelled'
+            : 'sign-in timed out or was cancelled',
+        );
         return;
       }
+
+      try {
+        await WebBrowser.dismissBrowser();
+      } catch {}
+
+      const redirectUrl = sessionResult.url;
 
       const query = redirectUrl.includes('?') ? redirectUrl.split('?')[1].split('#')[0] : '';
       const params = new URLSearchParams(query);
@@ -142,17 +185,24 @@ export function useGoogleSignIn(opts: Options | (() => void)) {
         return;
       }
 
-      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: ANDROID_CLIENT_ID,
-          code,
-          redirect_uri: redirectUri,
-          code_verifier: codeVerifier,
-          grant_type: 'authorization_code',
-        }).toString(),
-      });
+      const tokenExchangeUrl = 'https://oauth2.googleapis.com/token';
+      let tokenRes: Response;
+      try {
+        tokenRes = await fetch(tokenExchangeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: ANDROID_CLIENT_ID,
+            code,
+            redirect_uri: redirectUri,
+            code_verifier: codeVerifier,
+            grant_type: 'authorization_code',
+          }).toString(),
+        });
+      } catch (err: any) {
+        console.log('[NET ERROR] google-auth/exchange', tokenExchangeUrl, err?.message ?? err);
+        throw err;
+      }
 
       if (!tokenRes.ok) {
         const text = await tokenRes.text();

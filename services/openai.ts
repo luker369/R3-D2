@@ -15,6 +15,7 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 import { ENABLE_WEB_SEARCH } from '@/lib/feature-flags';
+import { buildContext } from '@/context/buildContext';
 
 // If EXPO_PUBLIC_OPENAI_BASE_URL is set (e.g. https://r2-proxy.workers.dev/v1), requests go through
 // your proxy which holds the real OpenAI key. In that case, EXPO_PUBLIC_OPENAI_API_KEY can be a
@@ -37,6 +38,11 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err: any) {
+    // [NET ERROR] log so failed openai requests surface their URL alongside
+    // the error. URL is safe to print — auth lives in headers, not the path.
+    console.log('[NET ERROR] openai', url, err?.message ?? err);
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -229,7 +235,7 @@ const SYSTEM_PROMPT =
  * Send the full conversation history to GPT and return the assistant's reply.
  * Used by memory.ts for the extract-and-save step (non-streaming is fine there).
  */
-function buildSystemContent(memoryContext?: string, systemSettings?: Record<string, string>): string {
+function buildSystemContent(userMessage: string, memoryContext?: string, systemSettings?: Record<string, string>): string {
   let content = SYSTEM_PROMPT;
   if (systemSettings && Object.keys(systemSettings).length > 0) {
     const keyLabels: Record<string, string> = {
@@ -255,16 +261,31 @@ function buildSystemContent(memoryContext?: string, systemSettings?: Record<stri
       .join('\n');
     content = `PINNED CONFIGURATION (treat as absolute):\n${pinned}\n\n` + content;
   }
+  // Inject only the slice of context.json that's relevant to this turn (selected
+  // by buildContext's keyword/alias matching against the latest user message),
+  // rather than dumping the full profile blob into every request.
+  const turnContext = userMessage ? buildContext({ userMessage }).trim() : '';
+  if (turnContext) {
+    content += `\n\nRELEVANT USER CONTEXT (selected for this turn — treat as trusted baseline unless the user explicitly updates it):\n${turnContext}`;
+  }
   if (memoryContext) {
     content += `\n\nMEMORY — treat this as ground truth. Reference it proactively. Never ask the user for information already listed here:\n${memoryContext}`;
   }
   return content;
 }
 
+function latestUserText(history: Message[]): string {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role !== 'user') continue;
+    return extractTextContent(history[i].content).trim();
+  }
+  return '';
+}
+
 export type ChatOptions = { jsonMode?: boolean };
 
 export async function getChatResponse(history: Message[], memoryContext?: string, systemSettings?: Record<string, string>, model = 'gpt-5.4', opts: ChatOptions = {}): Promise<string> {
-  const systemContent = buildSystemContent(memoryContext, systemSettings);
+  const systemContent = buildSystemContent(latestUserText(history), memoryContext, systemSettings);
   const useResponsesApi = hasImageContent(history) && !opts.jsonMode;
 
   if (useResponsesApi) {
@@ -380,8 +401,10 @@ export function streamChatResponse(
   systemSettings?: Record<string, string>,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const systemContent = buildSystemContent(memoryContext, systemSettings);
     const { allow: intentAllow, query: gateQuery } = shouldUseWebSearch(history);
+    // gateQuery is already the latest user-message text — reuse it so
+    // buildContext sees the same string the search-gate evaluated.
+    const systemContent = buildSystemContent(gateQuery, memoryContext, systemSettings);
     // Feature flag ENABLE_WEB_SEARCH is a hard kill switch; it cannot enable
     // search past the intent gate, only forbid it. Both must agree.
     const useSearch = intentAllow && ENABLE_WEB_SEARCH;

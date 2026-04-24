@@ -19,10 +19,21 @@ if (!process.env.JAVA_HOME && process.platform === "win32") {
   }
 }
 
+// Restrict Gradle to a single native ABI to cut ~4x off native compile/pack.
+// Override with R2D3_ABI=x86_64 (emulator) or R2D3_ABI=arm64-v8a,x86_64 etc.
+// Gradle auto-maps ORG_GRADLE_PROJECT_<name> env vars to -P<name>=..., which
+// is the only reliable way to pass properties through `expo run:android`
+// (its CLI does not forward arbitrary gradle args).
+const abi = process.env.R2D3_ABI || "arm64-v8a";
+const childEnv = {
+  ...process.env,
+  ORG_GRADLE_PROJECT_reactNativeArchitectures: abi,
+};
+
 const r = spawnSync("npx", ["expo", "run:android", ...process.argv.slice(2)], {
   cwd: root,
   stdio: "inherit",
-  env: process.env,
+  env: childEnv,
   shell: true,
 });
 

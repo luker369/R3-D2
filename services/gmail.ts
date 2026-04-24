@@ -29,6 +29,20 @@ export type GmailMessage = {
   account?: string;
 };
 
+// [gmail-debug] One-time module-load probe. Logs only presence + length, never
+// the actual values, so secrets stay out of console history. Remove these
+// console.logs once Gmail is verified working end-to-end.
+const probe = (v: string | undefined) => (v ? `set(len=${v.length})` : 'MISSING');
+console.log(
+  '[gmail-debug] env at bundle time:',
+  'URL_1=', probe(process.env.EXPO_PUBLIC_APPS_SCRIPT_URL),
+  'SECRET_1=', probe(process.env.EXPO_PUBLIC_APPS_SCRIPT_SECRET),
+  'URL_2=', probe(process.env.EXPO_PUBLIC_APPS_SCRIPT_URL_2),
+  'SECRET_2=', probe(process.env.EXPO_PUBLIC_APPS_SCRIPT_SECRET_2),
+  'URL_3=', probe(process.env.EXPO_PUBLIC_APPS_SCRIPT_URL_3),
+  'SECRET_3=', probe(process.env.EXPO_PUBLIC_APPS_SCRIPT_SECRET_3),
+);
+
 // Static references so Expo's bundler can inline each value.
 function loadAccounts(): Account[] {
   const raw = [
@@ -102,6 +116,12 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { signal: controller.signal });
+  } catch (err: any) {
+    // [NET ERROR] log so failed gmail Apps Script calls surface the URL.
+    // Redact the secret query param before printing.
+    const safeUrl = url.replace(/secret=[^&]+/, 'secret=***');
+    console.log('[NET ERROR] gmail', safeUrl, err?.message ?? err);
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -154,6 +174,8 @@ async function callRaw(
 
   const params = new URLSearchParams({ secret: target.secret, action, ...extra });
   const url = `${target.url}?${params.toString()}`;
+  // [gmail-debug] log the resolved URL with the secret redacted
+  console.log(`[gmail-debug] callRaw url=${url.replace(/secret=[^&]+/, 'secret=***')}`);
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -179,6 +201,52 @@ async function callRaw(
   return { ok: false, error: 'unreachable', account: target.label };
 }
 
+/**
+ * [gmail-debug] One-shot diagnostic. Bypasses the JSON parser so HTML error
+ * pages from Apps Script (login redirect, "Service unavailable", etc.) are
+ * visible instead of being silently flattened to []. Call once from app boot,
+ * then remove. Logs raw response body so you can paste it back here.
+ */
+export async function diagnoseGmail(): Promise<void> {
+  console.log('[gmail-diag] === START ===');
+  const accounts = loadAccounts();
+  console.log('[gmail-diag] loaded', accounts.length, 'account(s):', accounts.map(a => a.label).join(', ') || '<none>');
+  if (accounts.length === 0) {
+    console.log('[gmail-diag] STOP — no accounts. Env vars are not in the JS bundle.');
+    console.log('[gmail-diag] Fix: stop Metro, run `npx expo start --clear`, rebuild dev client.');
+    return;
+  }
+  const acc = accounts[0];
+  console.log('[gmail-diag] acc.label=', acc.label);
+  console.log('[gmail-diag] acc.url=', acc.url);
+  console.log('[gmail-diag] acc.url ends with /exec?', acc.url.endsWith('/exec'));
+  console.log('[gmail-diag] acc.secret length=', acc.secret.length);
+  const url = `${acc.url}?secret=${encodeURIComponent(acc.secret)}&action=recent&count=1`;
+  console.log('[gmail-diag] calling (redacted):', url.replace(/secret=[^&]+/, 'secret=***'));
+  try {
+    const res = await fetch(url);
+    console.log('[gmail-diag] status=', res.status, 'ok=', res.ok);
+    console.log('[gmail-diag] content-type=', res.headers.get('content-type'));
+    const text = await res.text();
+    console.log('[gmail-diag] raw body (first 600 chars):\n' + text.slice(0, 600));
+    if (text.startsWith('<!DOCTYPE') || text.includes('<html')) {
+      console.log('[gmail-diag] DIAGNOSIS: HTML response. Apps Script likely redirected to a login page → "Who has access" is not "Anyone", OR the URL is stale and Google is serving an error page.');
+    } else if (text.includes('"error"')) {
+      console.log('[gmail-diag] DIAGNOSIS: JSON error from script. Most often: secret mismatch.');
+    } else if (text.trim() === '[]') {
+      console.log('[gmail-diag] DIAGNOSIS: Script ran successfully and returned an empty array. Wrong deployer account, OR inbox actually empty for this query.');
+    } else if (text.startsWith('[')) {
+      console.log('[gmail-diag] DIAGNOSIS: Script returned messages — Gmail wiring works. The "no messages found" came from a downstream filter (count=0, label filter, sort).');
+    } else {
+      console.log('[gmail-diag] DIAGNOSIS: Unexpected body shape — paste the raw body above for triage.');
+    }
+  } catch (e: any) {
+    console.log('[gmail-diag] fetch threw:', e?.message ?? e);
+    console.log('[gmail-diag] DIAGNOSIS: Network error reaching the URL — bad URL host, no internet, or CORS/redirect failure.');
+  }
+  console.log('[gmail-diag] === END ===');
+}
+
 async function fetchOne(
   acc: Account,
   action: string,
@@ -190,6 +258,8 @@ async function fetchOne(
     ...extra,
   });
   const url = `${acc.url}?${params.toString()}`;
+  // [gmail-debug] log the resolved URL with the secret redacted
+  console.log(`[gmail-debug] fetchOne acc=${acc.label} url=${url.replace(/secret=[^&]+/, 'secret=***')}`);
 
   // Apps Script 302-redirects once to script.googleusercontent.com; mobile networks
   // sometimes drop that. One retry with backoff recovers silently.

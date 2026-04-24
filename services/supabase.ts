@@ -12,6 +12,8 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
+console.log('SUPABASE URL:', process.env.EXPO_PUBLIC_SUPABASE_URL);
+console.log('SUPABASE KEY EXISTS:', !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
 // Loud at module load — without these, queries construct fine but fail later
 // with opaque "fetch failed" errors that are a pain to trace.
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {

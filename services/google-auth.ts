@@ -76,11 +76,18 @@ export async function getAccessToken(): Promise<string | null> {
     };
     if (CLIENT_SECRET) params.client_secret = CLIENT_SECRET;
 
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(params).toString(),
-    });
+    const refreshUrl = 'https://oauth2.googleapis.com/token';
+    let res: Response;
+    try {
+      res = await fetch(refreshUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(params).toString(),
+      });
+    } catch (err: any) {
+      console.log('[NET ERROR] google-auth/refresh', refreshUrl, err?.message ?? err);
+      throw err;
+    }
 
     if (!res.ok) { console.warn('[google-auth] refresh failed:', res.status); return null; }
     const json = await res.json();

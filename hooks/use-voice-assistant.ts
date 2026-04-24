@@ -36,9 +36,13 @@ import {
 import { detectSynthesisCommand } from "@/lib/synthesis-commands";
 import { runDailySynthesis } from "@/services/daily-synthesis";
 import {
+    deleteMemoriesByTopic,
+    deleteMostRecentMemory,
     extractAndSaveMemory,
     fetchMemories,
     fetchSystemSettings,
+    formatMemoriesForSpeech,
+    listMemories,
     saveEntry,
     saveSystemSetting,
 } from "@/services/memory";
@@ -52,7 +56,14 @@ import {
     type TtsVoice,
 } from "@/services/openai";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, DeviceEventEmitter, Linking, type AppStateStatus } from "react-native";
+import {
+  AppState,
+  DeviceEventEmitter,
+  Linking,
+  PermissionsAndroid,
+  Platform,
+  type AppStateStatus,
+} from "react-native";
 import { onAudioFrame } from "@/services/audio-stream";
 import { isHallucination, stripHallucinationSentences } from "@/lib/hallucinations";
 import { detectTaskCommand } from "@/lib/task-commands";
@@ -357,19 +368,64 @@ export function useVoiceAssistant() {
     },
   });
 
-  // Auto-start listening after startup sound finishes
+  // Auto-start listening after startup sound finishes.
+  // Android 14+ rejects FGS-start-from-background (ForegroundServiceStartNotAllowedException)
+  // and rejects FGS-type=microphone without RECORD_AUDIO granted (SecurityException).
+  // Both must hold before calling startForegroundService here — the user-gesture
+  // call sites (handlePress, assist) already have AppState=active by construction.
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (!mounted.current) return;
-      console.log("[VA] auto-start firing (3s post-mount)");
+    let cancelled = false;
+    let appStateSub: { remove: () => void } | null = null;
+
+    const run = async () => {
+      if (cancelled || !mounted.current) return;
+      console.log(
+        "[VA] auto-start firing (3s post-mount) appState=",
+        AppState.currentState,
+      );
+
+      if (AppState.currentState !== "active") {
+        console.log("[VA] auto-start deferred: AppState not active; waiting");
+        appStateSub = AppState.addEventListener("change", (next) => {
+          if (next === "active" && !cancelled && mounted.current) {
+            appStateSub?.remove();
+            appStateSub = null;
+            void run();
+          }
+        });
+        return;
+      }
+
+      if (Platform.OS === "android") {
+        const granted = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        ).catch(() => false);
+        if (!granted) {
+          const res = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          ).catch(() => PermissionsAndroid.RESULTS.DENIED);
+          if (res !== PermissionsAndroid.RESULTS.GRANTED) {
+            console.warn("[VA] auto-start aborted: RECORD_AUDIO not granted");
+            if (mounted.current) setStatusSafe("idle", "auto-start:mic-denied");
+            return;
+          }
+        }
+      }
+
       await startForegroundService();
       const ok = await ensureListeningLockedRef.current("auto-start");
       if (!ok && mounted.current) {
         setStatusSafe("idle", "auto-start:fail");
         stopForegroundService();
       }
-    }, 3000);
-    return () => clearTimeout(timer);
+    };
+
+    const timer = setTimeout(run, 3000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      appStateSub?.remove();
+    };
   }, []);
 
   const MAX_TRANSCRIPT = 50;
@@ -447,17 +503,14 @@ export function useVoiceAssistant() {
    */
   async function playSound(uri: string, retry: number = 0): Promise<void> {
     await hardAudioReset("pre-play");
-    if (isLooping.current) {
-      try {
-        // shouldPlayInBackground=true paired with MEDIA_PLAYBACK in the FGS
-        // service types (see services/foreground-service.ts). Without the
-        // FGS type, Android 14+ silently rejected the audio session and the
-        // player stalled (ready -> idle, currentTime never advanced) the
-        // moment the app was hidden.
-        await setPlaybackSessionActive(true);
-      } catch (e: any) {
-        console.warn("[VA] playSound setPlaybackSessionActive threw:", e?.message);
-      }
+    try {
+      // Always enable the playback session before TTS. Some spoken paths
+      // intentionally pause the listen loop first (for example Google sign-in),
+      // and gating this on isLooping caused replies to succeed text-wise while
+      // staying silent.
+      await setPlaybackSessionActive(true);
+    } catch (e: any) {
+      console.warn("[VA] playSound setPlaybackSessionActive threw:", e?.message);
     }
     const player = new Audio.Sound();
     const psAppState = AppState.currentState;
@@ -662,7 +715,7 @@ export function useVoiceAssistant() {
             "isLoaded=",
             loadStatus.isLoaded,
             "duration=",
-            loadStatus.isLoaded ? loadStatus.durationMillis / 1000 : 0,
+            loadStatus.isLoaded ? (loadStatus.durationMillis ?? 0) / 1000 : 0,
             "volume=",
             volumeLevel.current,
           );
@@ -695,6 +748,12 @@ export function useVoiceAssistant() {
       mounted.current,
     );
     if (!isLooping.current || !mounted.current) return;
+    // [mic-warmup] 250ms grace before restarting the recorder so the audio
+    // session has fully switched modes after the playback teardown. Without
+    // this, the first syllable of a fast follow-up gets clipped and the turn
+    // drops as too-short. Post-turn-only — manual press-to-talk skips this
+    // because it doesn't go through resumeLoop.
+    await new Promise<void>((r) => setTimeout(r, 250));
     let ok = await ensureListeningLockedRef.current("resumeLoop");
     if (!ok && mounted.current) {
       await new Promise<void>((r) => setTimeout(r, 250));
@@ -1136,6 +1195,56 @@ export function useVoiceAssistant() {
     return null;
   }
 
+  type RecallCommand = { scope: "all" } | { scope: "topic"; topic: string };
+  function parseRecallCommand(text: string): RecallCommand | null {
+    const t = text.trim().replace(/[?.!]+$/, "").trim();
+    let m;
+    if (
+      (m = t.match(
+        /^(?:what\s+do\s+you\s+(?:remember|know)|tell\s+me\s+what\s+you\s+(?:remember|know)|what\s+have\s+you\s+saved)(?:\s+about\s+(.+))?$/i,
+      ))
+    ) {
+      const target = m[1]?.trim();
+      if (!target || /^(?:me|us)$/i.test(target)) return { scope: "all" };
+      return { scope: "topic", topic: target };
+    }
+    if (/^(?:list|show)\s+(?:me\s+)?(?:my\s+|all\s+)?memories$/i.test(t)) {
+      return { scope: "all" };
+    }
+    return null;
+  }
+
+  type ForgetCommand = { mode: "last" } | { mode: "topic"; topic: string };
+  function parseForgetCommand(text: string): ForgetCommand | null {
+    const t = text.trim().replace(/[?.!]+$/, "").trim();
+    let m;
+    // "forget that" / "delete that" / "scratch that" / "forget the last one"
+    if (
+      /^(?:forget|delete|scratch|drop)\s+(?:that|it|the\s+last\s+(?:one|memory|note|entry))$/i.test(
+        t,
+      )
+    ) {
+      return { mode: "last" };
+    }
+    // "forget|delete the (memory|note|todo) about <X>" / "delete the entry on <X>"
+    if (
+      (m = t.match(
+        /^(?:forget|delete|remove|drop|erase)\s+(?:the\s+|my\s+|that\s+)?(?:memory|note|todo|task|entry|record)\s+(?:about|on|of|regarding)\s+(.+)$/i,
+      ))
+    ) {
+      return { mode: "topic", topic: m[1].trim() };
+    }
+    // "forget (everything) about <X>" / "delete everything about <X>"
+    if (
+      (m = t.match(
+        /^(?:forget|delete|remove|erase)\s+(?:everything\s+)?about\s+(.+)$/i,
+      ))
+    ) {
+      return { mode: "topic", topic: m[1].trim() };
+    }
+    return null;
+  }
+
   function buildHistorySlice(): Message[] {
     const recent = history.current.slice(-12);
     if (!historySummary.current) return recent;
@@ -1320,11 +1429,14 @@ export function useVoiceAssistant() {
       const finalText = recovered ?? original;
 
       if (
-        finalText.trim().split(/\s+/).length < 2 ||
+        // [mic-tuning] Temporarily relaxed from `< 2 words` to `empty trim`
+        // while diagnosing clipped first-syllable drops. Revert once mic
+        // warm-up confirms the real cause.
+        finalText.trim().length === 0 ||
         isHallucination(finalText)
       ) {
         console.log(
-          `[VA] dropped transcription (${isHallucination(finalText) ? "hallucination" : "too-short"}):`,
+          `[VA] dropped transcription (${isHallucination(finalText) ? "hallucination" : "empty"}):`,
           JSON.stringify(finalText),
         );
         isProcessing.current = false;
@@ -1446,6 +1558,69 @@ export function useVoiceAssistant() {
         }
       }
 
+      // ── Memory recall ─────────────────────────────────────────────────────
+      // Matches "what do you remember [about X]", "list memories", etc.
+      // Runs before parseSaveCommand so a "what do you remember" query is never
+      // mistaken for a save phrase.
+      const recallMatch = parseRecallCommand(finalText);
+      if (recallMatch) {
+        try {
+          const rows = await listMemories(
+            recallMatch.scope === "topic" ? { topic: recallMatch.topic } : undefined,
+          );
+          if (rows.length === 0) {
+            const where =
+              recallMatch.scope === "topic" ? ` about ${recallMatch.topic}` : "";
+            return await speakAndFinish(`Nothing on file${where} yet.`);
+          }
+          const preface =
+            recallMatch.scope === "topic"
+              ? `On ${recallMatch.topic}: `
+              : `Here's what I have. `;
+          return await speakAndFinish(preface + formatMemoriesForSpeech(rows));
+        } catch (err: any) {
+          console.warn("[VA] memory recall failed:", err?.message);
+          if (mounted.current) {
+            setError("Memory readout failed. Check your connection.");
+            setStatusSafe("error", "memory-recall-failed");
+          }
+          isProcessing.current = false;
+          return;
+        }
+      }
+
+      // ── Memory deletion ───────────────────────────────────────────────────
+      const forgetMatch = parseForgetCommand(finalText);
+      if (forgetMatch) {
+        try {
+          if (forgetMatch.mode === "last") {
+            const removed = await deleteMostRecentMemory();
+            if (!removed) return await speakAndFinish("Nothing recent to forget.");
+            return await speakAndFinish(`Forgotten: ${removed.content}`);
+          }
+          const result = await deleteMemoriesByTopic(forgetMatch.topic);
+          if (result.deleted === 0) {
+            return await speakAndFinish(
+              `Nothing matching ${forgetMatch.topic} to delete.`,
+            );
+          }
+          if (result.deleted === 1) {
+            return await speakAndFinish(`Forgotten: ${result.preview[0]}`);
+          }
+          return await speakAndFinish(
+            `Deleted ${result.deleted} entries on ${forgetMatch.topic}.`,
+          );
+        } catch (err: any) {
+          console.warn("[VA] memory delete failed:", err?.message);
+          if (mounted.current) {
+            setError("Memory delete failed. Check your connection.");
+            setStatusSafe("error", "memory-delete-failed");
+          }
+          isProcessing.current = false;
+          return;
+        }
+      }
+
       // ── Voice-commanded saves ─────────────────────────────────────────────
       const saveMatch = parseSaveCommand(finalText);
       if (saveMatch) {
@@ -1509,7 +1684,7 @@ export function useVoiceAssistant() {
         isLooping.current = false;
         setLooping(false);
         await speakAndFinish("Opening Google sign-in in your browser.");
-        promptGoogleSignIn();
+        await promptGoogleSignIn();
         return;
       }
 

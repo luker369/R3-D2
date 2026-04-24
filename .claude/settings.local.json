@@ -53,7 +53,14 @@
       "Bash(./gradlew.bat app:assembleDebug -x lint -x test --console=plain)",
       "Bash(tasklist //FI \"IMAGENAME eq java.exe\")",
       "Bash(awk 'NR==127' plugins/with-voice-interaction.js)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(tasklist)",
+      "Bash(wmic process *)",
+      "Bash(adb kill-server *)",
+      "Bash(adb start-server *)",
+      "PowerShell(Get-PnpDevice *)",
+      "Bash(npm run *)",
+      "Bash(tee /tmp/r2d3-build.log)"
     ]
   }
 }

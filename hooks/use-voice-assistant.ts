@@ -118,6 +118,12 @@ export type AssistantStatus =
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useVoiceAssistant() {
+  console.log("[BUILD CHECK] commit=53c465c voice-stable-preview");
+  console.log("[BUILD CHECK] POST_RESTART_GRACE_MS=", POST_RESTART_GRACE_MS);
+  console.log("[BUILD CHECK] PLAYBACK_ECHO_GUARD_MS=", PLAYBACK_ECHO_GUARD_MS);
+  console.log("[BUILD CHECK] SUPABASE URL:", process.env.EXPO_PUBLIC_SUPABASE_URL);
+  console.log("[BUILD CHECK] OPENAI KEY EXISTS:", !!process.env.EXPO_PUBLIC_OPENAI_API_KEY);
+  
   const [status, setStatus] = useState<AssistantStatus>("idle");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [error, setError] = useState<string | null>(null);

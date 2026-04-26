@@ -2424,10 +2424,16 @@ export function useVoiceAssistant() {
     const unsub = onAudioFrame((frame) => {
       if (!isRecordingRef.current) return;
       if (statusRef.current !== "listening") return;
-      if (Date.now() - recordingStartedAt.current < POST_RESTART_GRACE_MS)
-        return;
-      if (Date.now() - lastPlaybackEndedAt.current < PLAYBACK_ECHO_GUARD_MS)
-        return;
+      if (
+        recordingStartedAt.current == null ||
+        Date.now() - recordingStartedAt.current < POST_RESTART_GRACE_MS
+        )
+  return;
+      if (
+        lastPlaybackEndedAt.current == null ||
+        Date.now() - lastPlaybackEndedAt.current < PLAYBACK_ECHO_GUARD_MS
+        )
+  return;
 
       const db = frame.dbfs;
       const threshold = ambientDb.current + SPEECH_MARGIN_DB;

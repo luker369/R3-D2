@@ -248,7 +248,7 @@ function buildSystemContent(userMessage: string, memoryContext?: string, systemS
       personality: 'Current tone/style',
     };
     const PERSONALITY_HINTS: Record<string, string> = {
-      casual:   'Speak casually and conversationally — contractions, relaxed phrasing, natural flow.',
+      casual: 'Speak casually and conversationally. Keep replies tight: usually 1–3 short sentences unless the user asks for detail.',
       formal:   'Speak formally and precisely — no contractions, measured and professional.',
       brief:    'Be extremely concise — one or two sentences maximum, no elaboration.',
       detailed: 'Give thorough, complete answers — cover relevant context and nuance.',

@@ -335,11 +335,16 @@ export async function getChatResponse(history: Message[], memoryContext?: string
   const body: Record<string, any> = { model, messages: [{ role: 'system', content: systemContent }, ...history] };
   if (opts.jsonMode) body.response_format = { type: 'json_object' };
 
+  const t0 = Date.now();
+  console.log("[LLM] start");
+
   const res = await withRetry(() => fetchWithTimeout(`${BASE}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }, 20_000));
+
+  console.log("[LLM] end", Date.now() - t0, "ms");
 
   if (!res.ok) {
     console.warn('[openai] Chat error body:', await res.text().catch(() => '<unreadable>'));
@@ -607,6 +612,8 @@ export async function synthesizeSpeech(text: string, filename = 'tts-response.mp
     if (info.exists) return cached;
     ttsMemCache.delete(cacheKey);
   }
+  const t0 = Date.now();
+  console.log("[TTS] start");
 
   const res = await withRetry(() => fetchWithTimeout(`${BASE}/audio/speech`, {
     method: 'POST',
@@ -619,6 +626,8 @@ export async function synthesizeSpeech(text: string, filename = 'tts-response.mp
       input: text,
     }),
   }, 15_000));
+
+  console.log("[TTS] end", Date.now() - t0, "ms");
 
   if (!res.ok) {
     console.warn('[openai] TTS error body:', await res.text().catch(() => '<unreadable>'));

@@ -13,7 +13,6 @@
  *   Account 2/3 (optional): add _2 / _3 suffix to each.
  */
 
-console.log("[gmail-debug] URL:", process.env.EXPO_PUBLIC_APPS_SCRIPT_URL);
 
 type Account = {
   label: string;
@@ -135,6 +134,7 @@ export async function replyToThread(
   return callRaw('reply', { threadId, body }, label);
 }
 
+
 async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -171,6 +171,8 @@ async function call(
     console.warn(`[gmail] no account matching label "${labelFilter}"`);
     return [];
   }
+
+  console.log("[gmail-loop] targets:", targets.map(t => t.label).join(", "));
 
   // allSettled so one bad account in a multi-account fan-out doesn't poison
   // the read. If at least one target succeeded, return the merged successes
@@ -221,6 +223,7 @@ async function callRaw(
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
+      console.log("[gmail] fetching:", target.label, url);
       const res = await fetchWithTimeout(url, 15_000);
       const data = await res.json();
       if (data && data.error) {

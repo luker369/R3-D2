@@ -27,6 +27,7 @@ export function ListenButton({ status, looping, onPress }: Props) {
   const { label, color } = STATUS_CONFIG[status];
   const displayLabel = looping ? (status === 'idle' ? 'Stop' : label) : label;
   const displayColor = looping && status === 'idle' ? '#DC2626' : color;
+  console.log("[BUTTON]", { status, displayLabel, looping });
 
   return (
     <Pressable
@@ -36,6 +37,8 @@ export function ListenButton({ status, looping, onPress }: Props) {
     </Pressable>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   button: {

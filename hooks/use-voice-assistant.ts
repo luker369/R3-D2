@@ -87,8 +87,8 @@ import { useVoiceRecorder } from "./use-voice-recorder";
 const SILENCE_DURATION_MS = 900;
 const SPEECH_CONFIRM_SAMPLES = 2; // 200ms of sustained sound before arming
 const MIN_SPEECH_DURATION_MS = 300; // must speak for at least 0.3s total
-const POST_RESTART_GRACE_MS = 400; // ignore mic briefly after recorder restarts (prevents TTS bleed from triggering)
-const PLAYBACK_ECHO_GUARD_MS = 1200; // ignore mic briefly after speaker playback ends so R2 doesn't hear itself
+const POST_RESTART_GRACE_MS = 200; // ignore mic briefly after recorder restarts (prevents TTS bleed from triggering)
+const PLAYBACK_ECHO_GUARD_MS = 300; // ignore mic briefly after speaker playback ends so R2 doesn't hear itself
 const SPEECH_MARGIN_DB = 10; // dB above ambient floor to count as speech
 const AMBIENT_ALPHA = 0.05; // EMA smoothing: lower = slower adaptation
 const SHORT_SENTENCE_FLUSH_MS = 350; // don't make tiny first sentences wait forever for another chunk
@@ -123,6 +123,7 @@ export function useVoiceAssistant() {
   const [error, setError] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
 
+  const recordingStartRef = useRef<number | null>(null);
   const history = useRef<Message[]>([]);
   const historySummary = useRef<string>("");
   const hasSpoken = useRef(false);
@@ -136,6 +137,7 @@ export function useVoiceAssistant() {
   const processingGen = useRef(0);
   const turnsSinceCompress = useRef(0);
   const lastPlaybackEndedAt = useRef(0);
+
 
   // Two-turn calendar confirmation: on a calendar utterance we parse, stash
   // the proposed event here, and speak a summary + "Should I create it?". The
@@ -213,6 +215,7 @@ export function useVoiceAssistant() {
 
   const markPlaybackEnded = useCallback((reason: string) => {
     lastPlaybackEndedAt.current = Date.now();
+    console.log("[VA HANDOFF] playback ended:", reason, "at", lastPlaybackEndedAt.current);
     resetSpeechDetection(`playback-ended:${reason}`);
   }, [resetSpeechDetection]);
 
@@ -289,9 +292,13 @@ export function useVoiceAssistant() {
 
   const ensureListeningLocked = useCallback(
     async (reason: string): Promise<boolean> => {
-      // Branch 1: already active — short-circuit success.
-      if (isRecordingRef.current && statusRef.current === "listening") {
-        console.log(`[VA GATE ${reason}] short-circuit: already listening+recording`);
+      // Branch 1: recorder already active — listening is truthful immediately.
+      if (isRecordingRef.current) {
+        console.log(`[VA GATE ${reason}] short-circuit: recorder already active`);
+        console.log("[VA STATE HONESTY] recorder confirmed listening");
+        if (statusRef.current !== "listening" && mounted.current) {
+          setStatusSafe("listening", `gate:${reason}:already-recording`);
+        }
         return true;
       }
 
@@ -316,6 +323,8 @@ export function useVoiceAssistant() {
       const work = (async (): Promise<boolean> => {
         try {
           const started = await startRecording();
+          recordingStartRef.current = Date.now();
+          
           console.log(
             `[VA GATE ${reason}] startRecording =>`,
             started,
@@ -328,6 +337,7 @@ export function useVoiceAssistant() {
           // (startRecording returned false but recorder is running because
           // a concurrent call won the native race — same outcome for us).
           if (started || isRecordingRef.current) {
+            console.log("[VA STATE HONESTY] recorder confirmed listening");
             if (mounted.current) {
               setStatusSafe(
                 "listening",
@@ -398,7 +408,7 @@ export function useVoiceAssistant() {
     const run = async () => {
       if (cancelled || !mounted.current) return;
       console.log(
-        "[VA] auto-start firing (3s post-mount) appState=",
+        "[VA] auto-start firing appState=",
         AppState.currentState,
       );
 
@@ -438,11 +448,15 @@ export function useVoiceAssistant() {
       }
     };
 
-    const timer = setTimeout(run, 3000);
+    // Kick off the auto-start. Without this invocation `run` was dead code
+    // and the app launched stuck in "idle" (UI label: "Talk") — the gate
+    // never ran, so status never promoted to "listening".
+    void run();
+
     return () => {
       cancelled = true;
-      clearTimeout(timer);
       appStateSub?.remove();
+      appStateSub = null;
     };
   }, []);
 
@@ -574,12 +588,18 @@ export function useVoiceAssistant() {
         } catch {}
       };
 
-      const finishSuccess = (source: string) => {
+      // setTimeout(() => {
+      // console.log("[VA PREARM] starting mic before playback fully ends");
+      // resumeLoop();
+      // }, 300);
+
+      const finishSuccess = async (source: string) => {
         if (settled) return;
+        await new Promise(r => setTimeout(r, 200));
         settled = true;
         cleanupTimers();
         teardownPlayer();
-        markPlaybackEnded(source);
+        // markPlaybackEnded(source);
         console.log(
           "[BG-AUDIO] playSound end source=",
           source,
@@ -768,11 +788,7 @@ export function useVoiceAssistant() {
       mounted.current,
     );
     if (!isLooping.current || !mounted.current) return;
-    let ok = await ensureListeningLockedRef.current("resumeLoop");
-    if (!ok && mounted.current) {
-      await new Promise<void>((r) => setTimeout(r, 250));
-      ok = await ensureListeningLockedRef.current("resumeLoop:retry");
-    }
+    const ok = await ensureListeningLockedRef.current("resumeLoop");
     if (!ok && mounted.current) setStatusSafe("idle", "resumeLoop:fail");
   }
 
@@ -813,13 +829,13 @@ export function useVoiceAssistant() {
         isLooping.current
       ) {
         appWasInBackgroundRef.current = false;
-        const s = statusRef.current;
-        const rec = isRecordingRef.current;
-        if (s === "listening" && !rec) {
-          setTimeout(() => {
-            void resumeLoopRef.current();
-          }, 450);
-        }
+        // Mic restart is owned by the post-playback handoff in
+        // processRecording. Foreground transitions no longer kick the
+        // recorder on a timer — that path raced active TTS playback and
+        // re-armed the mic while audio was still emitting.
+        console.log(
+          "[VA] AppState -> active (was bg); skipping timer-based resume — handoff owns mic restart",
+        );
       }
     };
     const sub = AppState.addEventListener("change", onChange);
@@ -908,8 +924,8 @@ export function useVoiceAssistant() {
       } catch (e: any) {
         console.warn("[VA] releasePlaybackAudio threw (speakAndFinish):", e?.message);
       }
-      const delay = Math.min(800, 300 + reply.split(/\s+/).length * 20);
-      await new Promise<void>((r) => setTimeout(r, delay));
+      markPlaybackEnded("speakAndFinish:playback-release-complete");
+      await new Promise<void>((r) => setTimeout(r, 100));
       await finishTurnToListening(
         playbackFailed ? "speakAndFinish:playback-failed" : "speakAndFinish:end",
       );
@@ -1360,9 +1376,10 @@ export function useVoiceAssistant() {
     isProcessing.current = true;
     const myGen = ++processingGen.current;
     const stale = () => processingGen.current !== myGen;
-
+    const elapsed = Date.now() - recordingStartRef.current;
     const audioUri = await stopRecording();
     console.log("[VA] stopRecording returned", audioUri ? "uri" : "null");
+    console.log("[VA UX] speech captured, processing...");
     if (!audioUri) {
       isProcessing.current = false;
       if (isLooping.current) {
@@ -1413,6 +1430,10 @@ export function useVoiceAssistant() {
           fetchSystemSettings(),
           fetchCalendarContext(),
         ]);
+
+    console.log("[PIPELINE] sttMs=", timings.sttMs);
+    console.log("[PIPELINE] memory/calendar/settings total done");
+    console.log("[STT] transcript:", userText);
 
       if (stale()) return;
 
@@ -2043,7 +2064,10 @@ export function useVoiceAssistant() {
         clearPendingSentenceFlush();
         pendingSentenceFlushTimer = setTimeout(() => {
           pendingSentenceFlushTimer = null;
-          if (stale()) return;
+          if (stale()) {
+          console.warn(`[TTS turn=${turnId}] flush skipped because stale`);
+          return;
+          }
           const trimmed = pendingSentence.trim();
           if (!trimmed) return;
           console.log(
@@ -2070,6 +2094,9 @@ export function useVoiceAssistant() {
       const pushTts = (text: string) => {
         const trimmed = text.trim();
         if (!trimmed) return;
+        console.log(
+        `[TTS turn=${turnId}] pushTts called stale=${stale()} text="${trimmed.slice(0, 80)}"`
+        );
         const alphaRatio =
           (trimmed.match(/[a-zA-Z]/g)?.length ?? 0) / trimmed.length;
         if (alphaRatio < 0.4) return;
@@ -2277,15 +2304,12 @@ export function useVoiceAssistant() {
         }
       }
 
-      // Fire-and-forget: setAudioModeAsync takes 100–300ms and we're about to
-      // hand audio session back to the native recorder anyway, which owns its
-      // own session. Awaiting this was pure dead air before resumeLoop.
-      releasePlaybackAudio().catch((e: any) =>
-        console.warn(
-          "[VA] releasePlaybackAudio async failed (post-drain):",
-          e?.message,
-        ),
-      );
+      try {
+        await releasePlaybackAudio();
+      } catch (e: any) {
+        console.warn("[VA] releasePlaybackAudio threw (post-drain):", e?.message);
+      }
+      markPlaybackEnded(`turn-${turnId}-playback-release-complete`);
 
       if (stale()) {
         console.log(
@@ -2320,10 +2344,13 @@ export function useVoiceAssistant() {
         turnsSinceCompress.current = 0;
         compressHistory();
       }
-      // Short settle lets Android release the audio focus playSound held
-      // before the recorder re-grabs it. 200ms is plenty; the old 800ms was
-      // the dominant source of end-of-turn dead air.
-      await new Promise<void>((r) => setTimeout(r, 200));
+      // 100ms post-playback hardware settle: lets Android release the
+      // audio-output focus playSound held so the recorder re-grabs cleanly.
+      // This is the ONLY pre-startRecording delay in the post-turn handoff —
+      // the gate no longer adds a blanket wait, and the AppState path no
+      // longer fires a timer-based resume. Increase only if first-frame
+      // drops reappear.
+      await new Promise<void>((r) => setTimeout(r, 100));
       console.log(
         `[VA TIMING turn=${turnId}] STT=${timings.sttMs ?? "?"}ms ` +
           `TTFS=${timings.ttfs ?? "?"}ms ` +
@@ -2415,6 +2442,7 @@ export function useVoiceAssistant() {
           speechStart.current = Date.now();
           console.log(
             "[VA] speech armed db=",
+          console.log("[VA UX] speech detected - transitioning to processing"),
             db.toFixed(1),
             "ambient=",
             ambientDb.current.toFixed(1),

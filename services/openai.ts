@@ -165,7 +165,10 @@ function extractResponsesText(json: any): string {
  * React Native's FormData accepts an object literal with uri/type/name to upload
  * a local file — this differs from browser FormData behavior.
  */
-export async function transcribeAudio(audioUri: string): Promise<string> {
+export async function transcribeAudio(
+  audioUri: string,
+  signal?: AbortSignal,
+): Promise<string> {
   const formData = new FormData();
 
   const isWav = /\.wav(\?|$)/i.test(audioUri);
@@ -182,11 +185,14 @@ export async function transcribeAudio(audioUri: string): Promise<string> {
   formData.append('prompt', 'Talking to R3-D2.');
   formData.append('response_format', 'verbose_json');
 
-  const res = await withRetry(() => fetchWithTimeout(`${BASE}/audio/transcriptions`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${API_KEY}` },
-    body: formData,
-  }, 15_000));
+  const res = await withRetry(() =>
+    fetch(`${BASE}/audio/transcriptions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${API_KEY}` },
+      body: formData,
+      signal,
+    }),
+  );
 
   if (!res.ok) {
     console.warn('[openai] Whisper error body:', await res.text().catch(() => '<unreadable>'));

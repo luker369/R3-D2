@@ -84,10 +84,11 @@ import { useVoiceRecorder } from "./use-voice-recorder";
 
 // ─── Silence detection config ─────────────────────────────────────────────────
 
-const SILENCE_DURATION_MS = 900;
-const SPEECH_CONFIRM_SAMPLES = 2; // 200ms of sustained sound before arming
+const SILENCE_DURATION_MS = 500;
+const SPEECH_CONFIRM_SAMPLES = 4; // 200ms of sustained sound before arming
 const MIN_SPEECH_DURATION_MS = 300; // must speak for at least 0.3s total
-const POST_RESTART_GRACE_MS = 200; // ignore mic briefly after recorder restarts (prevents TTS bleed from triggering)
+const AUTO_START_DELAY_MS = 3000; // let launch audio/session state settle before first listen
+const POST_RESTART_GRACE_MS = 500; // ignore mic briefly after recorder restarts (prevents TTS bleed from triggering)
 const PLAYBACK_ECHO_GUARD_MS = 300; // ignore mic briefly after speaker playback ends so R2 doesn't hear itself
 const SPEECH_MARGIN_DB = 10; // dB above ambient floor to count as speech
 const AMBIENT_ALPHA = 0.05; // EMA smoothing: lower = slower adaptation
@@ -123,7 +124,7 @@ export function useVoiceAssistant() {
   console.log("[BUILD CHECK] PLAYBACK_ECHO_GUARD_MS=", PLAYBACK_ECHO_GUARD_MS);
   console.log("[BUILD CHECK] SUPABASE URL:", process.env.EXPO_PUBLIC_SUPABASE_URL);
   console.log("[BUILD CHECK] OPENAI KEY EXISTS:", !!process.env.EXPO_PUBLIC_OPENAI_API_KEY);
-  
+
   const [status, setStatus] = useState<AssistantStatus>("idle");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -140,6 +141,8 @@ export function useVoiceAssistant() {
   const recordingStartedAt = useRef<number>(0);
   const isProcessing = useRef(false);
   const streamAbort = useRef<AbortController | null>(null);
+  const sttAbortRef = useRef<AbortController | null>(null);
+  const sttTurnRef = useRef<number>(0);
   const processingGen = useRef(0);
   const turnsSinceCompress = useRef(0);
   const lastPlaybackEndedAt = useRef(0);
@@ -454,13 +457,16 @@ export function useVoiceAssistant() {
       }
     };
 
-    // Kick off the auto-start. Without this invocation `run` was dead code
-    // and the app launched stuck in "idle" (UI label: "Talk") — the gate
-    // never ran, so status never promoted to "listening".
-    void run();
+    // Cold start needs a short settle before arming the first listen. Preview
+    // builds hit this path much faster than dev and can otherwise capture
+    // launch-time audio/session noise as a bogus first utterance.
+    const timer = setTimeout(() => {
+      void run();
+    }, AUTO_START_DELAY_MS);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
       appStateSub?.remove();
       appStateSub = null;
     };
@@ -1382,10 +1388,17 @@ export function useVoiceAssistant() {
     isProcessing.current = true;
     const myGen = ++processingGen.current;
     const stale = () => processingGen.current !== myGen;
-    const elapsed = Date.now() - recordingStartRef.current;
+
     const audioUri = await stopRecording();
     console.log("[VA] stopRecording returned", audioUri ? "uri" : "null");
-    console.log("[VA UX] speech captured, processing...");
+    
+    const durationMs =
+  recordingStartRef.current == null
+    ? 0
+    : Date.now() - recordingStartRef.current;
+
+    console.log("[STT GUARD] durationMs=", durationMs);
+
     if (!audioUri) {
       isProcessing.current = false;
       if (isLooping.current) {
@@ -1395,6 +1408,13 @@ export function useVoiceAssistant() {
       }
       return;
     }
+    if (durationMs < 900) {
+      console.log(
+        `[STT GUARD] dropped too-short recording durationMs=${durationMs}`,
+      );
+    }
+
+    console.log("[VA UX] speech captured, processing...");
 
     // shouldPlayInBackground=true paired with MEDIA_PLAYBACK in the FGS
     // service types (see services/foreground-service.ts). See matching
@@ -1425,13 +1445,40 @@ export function useVoiceAssistant() {
     } = {};
 
     try {
+      if (sttAbortRef.current) {
+      console.log(
+      `[STT] existing transcription in flight turn=${sttTurnRef.current}; not aborting`,
+    );
+  }
+      const sttController = new AbortController();
+      sttAbortRef.current = sttController;
+      sttTurnRef.current = turnId;
       const sttStart = Date.now();
+      const sttPromise = transcribeAudio(audioUri, sttController.signal)
+        .then((r) => {
+          timings.sttMs = Date.now() - sttStart;
+          console.log(
+            `[STT SUCCESS] turn=${turnId} ms=${timings.sttMs} chars=${r.length}`,
+          );
+          return r;
+        })
+        .catch((err: any) => {
+          if (err?.name === "AbortError") {
+            console.log(`[STT ABORTED] turn=${turnId}`);
+          }
+          throw err;
+        })
+        .finally(() => {
+          console.log(`[STT COMPLETE] turn=${turnId}`);
+          if (sttAbortRef.current === sttController) {
+            sttAbortRef.current = null;
+            sttTurnRef.current = 0;
+          }
+        });
+      console.log(`[STT START] turn=${turnId} uri=${audioUri}`);
       const [userText, memoryContext, systemSettings, calendarContext] =
         await Promise.all([
-          transcribeAudio(audioUri).then((r) => {
-            timings.sttMs = Date.now() - sttStart;
-            return r;
-          }),
+          sttPromise,
           fetchMemories(),
           fetchSystemSettings(),
           fetchCalendarContext(),
@@ -2386,15 +2433,21 @@ export function useVoiceAssistant() {
           : msg.includes("timeout")
             ? "That took too long. Say it again."
             : msg.includes("whisper") || msg.includes("transcri")
-              ? "Missed that. Say it again."
+            ? ""
               : "Something went sideways. Standing by.";
 
       try {
-        await speakAndFinish(recoveryLine);
-      } catch {
-        setError(recoveryLine);
-        setStatusSafe("error", "catch-fallback");
-      }
+        if (recoveryLine) {
+          await speakAndFinish(recoveryLine);
+        } else {
+          console.log("[VA] silent STT/transcription failure — resumed listening");
+          isProcessing.current = false;
+          await resumeLoop();
+        }
+        } catch {
+          setError(recoveryLine || "Silent recovery failed");
+          setStatusSafe("error", "catch-fallback");
+        }
       // Guarantee the mic attempts to come back up even if speakAndFinish's
       // own resume failed or the catch-fallback branch ran.
       await finishTurnToListening("outer-catch-end");

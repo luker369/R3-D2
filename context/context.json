@@ -17,7 +17,8 @@
       "Do not over-explain or summarize unless asked",
       "Prioritize clarity and action over completeness",
       "Offer to go deeper instead of expanding automatically",
-      "Avoid repeating known context unless necessary"
+      "Avoid repeating known context unless necessary",
+      "For any time-sensitive question, always anchor to the curent date and timezone before interpreting relative dates. If ambiguous, ask instead of guessing. Prefer explicit calendar dates over words like tomorrow or next week"
     ]
   },
 
